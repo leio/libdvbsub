@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <stdint.h> /* uint16_t, ... */
 #include <stdio.h> /* perror, ... */
+#include <unistd.h> /* read, write, close, fdatasync */
 #include <sys/ioctl.h>
 #include <linux/dvb/dmx.h>
 #include <stdlib.h> /* exit */
