@@ -11,6 +11,8 @@ AM_CFLAGS =\
 bin_PROGRAMS = libdvbsub
 
 libdvbsub_SOURCES = \
-	main.c
+	main.c     \
+	dvb-sub.h     \
+	dvb-sub.c
 
 libdvbsub_LDADD = $(LIBDVBSUB_LIBS)
