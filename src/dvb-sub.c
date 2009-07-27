@@ -49,7 +49,7 @@ dvb_sub_class_init (DvbSubClass *klass)
 }
 
 static void
-_dvb_sub_handle_page_composition (DvbSub *dvb_sub, guint16 page_id, guchar *data, gint len) /* FIXME: Use guint for len here and in many other places? */
+_dvb_sub_handle_page_composition (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len) /* FIXME: Use guint for len here and in many other places? */
 {
 	int i;
 	unsigned int processed_len;
@@ -92,19 +92,19 @@ _dvb_sub_handle_page_composition (DvbSub *dvb_sub, guint16 page_id, guchar *data
 }
 
 static void
-_dvb_sub_handle_region_composition (DvbSub *dvb_sub, guint16 page_id, guchar *data, gint len)
+_dvb_sub_handle_region_composition (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len)
 {
 	/* TODO */
 }
 
 static void
-_dvb_sub_handle_clut_definition (DvbSub *dvb_sub, guint16 page_id, guchar *data, gint len)
+_dvb_sub_handle_clut_definition (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len)
 {
 	/* TODO */
 }
 
 static void
-_dvb_sub_handle_object_data (DvbSub *dvb_sub, guint16 page_id, guchar *data, gint len)
+_dvb_sub_handle_object_data (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len)
 {
 	static int counter = 0;
 	int i;
@@ -130,7 +130,7 @@ _dvb_sub_handle_object_data (DvbSub *dvb_sub, guint16 page_id, guchar *data, gin
 }
 
 static void
-_dvb_sub_handle_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guchar *data, gint len)
+_dvb_sub_handle_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len)
 {
 	static int counter = 0;
 	++counter;
@@ -166,7 +166,7 @@ dvb_sub_new (void)
  * Returns: a negative value on errors; Amount of data consumed on success. TODO
  */
 gint
-dvb_sub_feed (DvbSub *dvb_sub, guchar *data, gint len)
+dvb_sub_feed (DvbSub *dvb_sub, guint8 *data, gint len)
 {
 	guint64 pts = 0;
 	unsigned int pos = 0;
@@ -242,7 +242,7 @@ dvb_sub_feed (DvbSub *dvb_sub, guchar *data, gint len)
  *			0 or positive if data was handled. FIXME: List the positive return values.
  */
 gint
-dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guchar* data, gint len)
+dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8* data, gint len)
 {
 	unsigned int pos = 0;
 	guint8 segment_type;
