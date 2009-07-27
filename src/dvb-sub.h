@@ -1,8 +1,7 @@
 /* -*- Mode: C; indent-tabs-mode: t; c-basic-offset: 4; tab-width: 4 -*- */
 /*
- * libdvbsub
+ * libdvbsub - DVB subtitle decoding
  * Copyright (C) Mart Raudsepp 2009 <mart.raudsepp@artecdesign.ee>
- *
  */
 
 #ifndef _DVB_SUB_H_

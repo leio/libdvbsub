@@ -1,8 +1,33 @@
 /* -*- Mode: C; indent-tabs-mode: t; c-basic-offset: 4; tab-width: 4 -*- */
 /*
- * libdvbsub
+ * libdvbsub - DVB subtitle decoding
  * Copyright (C) Mart Raudsepp 2009 <mart.raudsepp@artecdesign.ee>
  * 
+ * Heavily uses code algorithms ported from ffmpeg's libavcodec/dvbsubdec.c,
+ * especially the segment parsers. The original license applies to this
+ * ported code and the whole code in this file as well.
+ *
+ * Original copyright information follows:
+ */
+/*
+ * DVB subtitle decoding for ffmpeg
+ * Copyright (c) 2005 Ian Caulfield
+ *
+ * This file is part of FFmpeg.
+ *
+ * FFmpeg is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * FFmpeg is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with FFmpeg; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include "dvb-sub.h"
@@ -49,7 +74,7 @@ dvb_sub_class_init (DvbSubClass *klass)
 }
 
 static void
-_dvb_sub_handle_page_composition (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len) /* FIXME: Use guint for len here and in many other places? */
+_dvb_sub_parse_page_composition (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len) /* FIXME: Use guint for len here and in many other places? */
 {
 	int i;
 	unsigned int processed_len;
@@ -92,19 +117,19 @@ _dvb_sub_handle_page_composition (DvbSub *dvb_sub, guint16 page_id, guint8 *data
 }
 
 static void
-_dvb_sub_handle_region_composition (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len)
+_dvb_sub_parse_region_composition (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len)
 {
 	/* TODO */
 }
 
 static void
-_dvb_sub_handle_clut_definition (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len)
+_dvb_sub_parse_clut_definition (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len)
 {
 	/* TODO */
 }
 
 static void
-_dvb_sub_handle_object_data (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len)
+_dvb_sub_parse_object_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len)
 {
 	static int counter = 0;
 	int i;
@@ -115,13 +140,16 @@ _dvb_sub_handle_object_data (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gin
 		"Reserved (0x03)"
 	};
 
+	guint16 object_id;
+
 	++counter;
 	g_print ("OBJECT DATA %d: page_id = %u, length = %d; content is:\nOBJECT DATA %d (content): ", counter, page_id, len, counter);
 	for (i = 0; i < len; ++i)
 		g_print ("0x%x ", data[i]);
 	g_print("\n");
 
-	g_print ("OBJECT DATA %d: object_id = %u (0x%x 0x%x)\n", counter, (data[0] << 8) | data[1], data[0], data[1]);
+	object_id = (data[0] << 8) | data[1];
+	g_print ("OBJECT DATA %d: object_id = %u (0x%x 0x%x)\n", counter, object_id, data[0], data[1]);
 	g_print ("OBJECT DATA %d: object version number = 0x%x (rolling counter from 0x0 to 0xf and then wraparound)\n", counter, (data[2] >> 4) & 0xf);
 	g_print ("OBJECT DATA %d: coding_method = %s\n", counter, coding_method[(data[1] >> 2) & 0x3]);
 	g_print ("OBJECT DATA %d: Reserved = 0x%x\n", counter, data[1] & 0x3);
@@ -130,7 +158,7 @@ _dvb_sub_handle_object_data (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gin
 }
 
 static void
-_dvb_sub_handle_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len)
+_dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len)
 {
 	static int counter = 0;
 	++counter;
@@ -290,23 +318,23 @@ dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8* data, gint len)
 		switch (segment_type) {
 			case DVB_SUB_SEGMENT_PAGE_COMPOSITION:
 				g_print ("Page composition segment at buffer pos %u\n", pos);
-				_dvb_sub_handle_page_composition (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
+				_dvb_sub_parse_page_composition (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
 				break;
 			case DVB_SUB_SEGMENT_REGION_COMPOSITION:
 				g_print ("Region composition segment at buffer pos %u\n", pos);
-				_dvb_sub_handle_region_composition (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
+				_dvb_sub_parse_region_composition (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
 				break;
 			case DVB_SUB_SEGMENT_CLUT_DEFINITION:
 				g_print ("CLUT definition segment at buffer pos %u\n", pos);
-				_dvb_sub_handle_clut_definition (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
+				_dvb_sub_parse_clut_definition (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
 				break;
 			case DVB_SUB_SEGMENT_OBJECT_DATA:
 				g_print ("Object data segment at buffer pos %u\n", pos);
-				_dvb_sub_handle_object_data (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
+				_dvb_sub_parse_object_segment (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
 				break;
 			case DVB_SUB_SEGMENT_END_OF_DISPLAY_SET:
 				g_print ("End of display set at buffer pos %u\n", pos);
-				_dvb_sub_handle_end_of_display_set (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
+				_dvb_sub_parse_end_of_display_set (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
 				break;
 			default:
 				g_warning ("Unhandled segment type 0x%x", segment_type);
