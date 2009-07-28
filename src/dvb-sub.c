@@ -162,7 +162,7 @@ dvb_sub_class_init (DvbSubClass *klass)
 }
 
 static void
-_dvb_sub_parse_page_composition (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len) /* FIXME: Use guint for len here and in many other places? */
+_dvb_sub_parse_page_composition (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint buf_size) /* FIXME: Use guint for buf_size here and in many other places? */
 {
 	int i;
 	unsigned int processed_len;
@@ -175,28 +175,28 @@ _dvb_sub_parse_page_composition (DvbSub *dvb_sub, guint16 page_id, guint8 *data,
 	};
 
 	++counter;
-	g_print ("PAGE COMPOSITION %d: page_id = %u, length = %d; content is:\nPAGE COMPOSITION %d: ", counter, page_id, len, counter);
-	for (i = 0; i < len; ++i)
-		g_print ("0x%x ", data[i]);
+	g_print ("PAGE COMPOSITION %d: page_id = %u, length = %d; content is:\nPAGE COMPOSITION %d: ", counter, page_id, buf_size, counter);
+	for (i = 0; i < buf_size; ++i)
+		g_print ("0x%x ", buf[i]);
 	g_print("\n");
 
-	g_print ("PAGE COMPOSITION %d: Page timeout = %u seconds\n", counter, data[0]);
-	g_print ("PAGE COMPOSITION %d: page version number = 0x%x (rolling counter from 0x0 to 0xf and then wraparound)\n", counter, (data[1] >> 4) & 0xf);
-	g_print ("PAGE COMPOSITION %d: page_state = %s\n", counter, page_state[(data[1] >> 2) & 0x3]);
-	g_print ("PAGE COMPOSITION %d: Reserved = 0x%x\n", counter, data[1] & 0x3);
+	g_print ("PAGE COMPOSITION %d: Page timeout = %u seconds\n", counter, buf[0]);
+	g_print ("PAGE COMPOSITION %d: page version number = 0x%x (rolling counter from 0x0 to 0xf and then wraparound)\n", counter, (buf[1] >> 4) & 0xf);
+	g_print ("PAGE COMPOSITION %d: page_state = %s\n", counter, page_state[(buf[1] >> 2) & 0x3]);
+	g_print ("PAGE COMPOSITION %d: Reserved = 0x%x\n", counter, buf[1] & 0x3);
 
 	processed_len = 2;
-	while (processed_len < len) {
-		if (len - processed_len < 6) {
-			g_warning ("PAGE COMPOSITION %d: Not enough bytes for a region block! 6 needed, but only have %d left in this page composition segment", counter, len - processed_len);
+	while (processed_len < buf_size) {
+		if (buf_size - processed_len < 6) {
+			g_warning ("PAGE COMPOSITION %d: Not enough bytes for a region block! 6 needed, but only have %d left in this page composition segment", counter, buf_size - processed_len);
 			return;
 		}
 
 		g_print ("PAGE COMPOSITION %d: REGION information: ID = %u, address = %ux%u  (reserved value that we don't care was 0x%x)\n", counter,
-		          data[processed_len],
-		         (data[processed_len + 2] << 8) | data[processed_len + 3],
-		         (data[processed_len + 4] << 8) | data[processed_len + 5],
-		          data[processed_len + 1]
+		          buf[processed_len],
+		         (buf[processed_len + 2] << 8) | buf[processed_len + 3],
+		         (buf[processed_len + 4] << 8) | buf[processed_len + 5],
+		          buf[processed_len + 1]
 		        );
 
 		processed_len += 6;
@@ -205,11 +205,11 @@ _dvb_sub_parse_page_composition (DvbSub *dvb_sub, guint16 page_id, guint8 *data,
 }
 
 static void
-_dvb_sub_parse_region_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint len)
+_dvb_sub_parse_region_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint buf_size)
 {
 	DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
 
-	const guint8 *buf_end = buf + len;
+	const guint8 *buf_end = buf + buf_size;
 	guint8 region_id;
 	guint16 object_id;
 	DVBSubRegion *region;
@@ -217,7 +217,7 @@ _dvb_sub_parse_region_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 	DVBSubObjectDisplay *object_display;
 	gboolean fill;
 
-	if (len < 10)
+	if (buf_size < 10)
 		return;
 
 	region_id = *buf++;
@@ -323,13 +323,13 @@ _dvb_sub_parse_region_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 }
 
 static void
-_dvb_sub_parse_clut_definition (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len)
+_dvb_sub_parse_clut_definition (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint buf_size)
 {
 	/* TODO */
 }
 
 static void
-_dvb_sub_parse_object_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len)
+_dvb_sub_parse_object_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint buf_size)
 {
 	static int counter = 0;
 	static gchar *coding_method[] = {
@@ -345,28 +345,28 @@ _dvb_sub_parse_object_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *data, g
 #if DEBUG_CONTENTS
 	{
 		int i;
-		g_print ("OBJECT DATA %d: page_id = %u, length = %d; content is:\nOBJECT DATA %d (content): ", counter, page_id, len, counter);
-		for (i = 0; i < len; ++i)
-			g_print ("0x%x ", data[i]);
+		g_print ("OBJECT DATA %d: page_id = %u, length = %d; content is:\nOBJECT DATA %d (content): ", counter, page_id, buf_size, counter);
+		for (i = 0; i < buf_size; ++i)
+			g_print ("0x%x ", buf[i]);
 		g_print("\n");
 	}
 #endif
 
-	object_id = (data[0] << 8) | data[1];
-	g_print ("OBJECT DATA %d: object_id = %u (0x%x 0x%x)\n", counter, object_id, data[0], data[1]);
-	g_print ("OBJECT DATA %d: object version number = 0x%x (rolling counter from 0x0 to 0xf and then wraparound)\n", counter, (data[2] >> 4) & 0xf);
-	g_print ("OBJECT DATA %d: coding_method = %s\n", counter, coding_method[(data[1] >> 2) & 0x3]);
-	g_print ("OBJECT DATA %d: Reserved = 0x%x\n", counter, data[1] & 0x3);
+	object_id = READ_UINT16_BE (buf);
+	g_print ("OBJECT DATA %d: object_id = %u (0x%x 0x%x)\n", counter, object_id, buf[0], buf[1]);
+	g_print ("OBJECT DATA %d: object version number = 0x%x (rolling counter from 0x0 to 0xf and then wraparound)\n", counter, (buf[2] >> 4) & 0xf);
+	g_print ("OBJECT DATA %d: coding_method = %s\n", counter, coding_method[(buf[1] >> 2) & 0x3]);
+	g_print ("OBJECT DATA %d: Reserved = 0x%x\n", counter, buf[1] & 0x3);
 
 	/* TODO */
 }
 
 static void
-_dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len)
+_dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint buf_size)
 {
 	static int counter = 0;
 	++counter;
-	g_print ("END OF DISPLAY SET %d: page_id = %u, length = %d\n", counter, page_id, len);
+	g_print ("END OF DISPLAY SET %d: page_id = %u, length = %d\n", counter, page_id, buf_size);
 	/* TODO */
 }
 
