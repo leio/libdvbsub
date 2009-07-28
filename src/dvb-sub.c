@@ -35,15 +35,6 @@
 
 /* FIXME: Are we waiting for an acquisition point before trying to do things? */
 
-typedef struct _DvbSubPrivate DvbSubPrivate;
-struct _DvbSubPrivate
-{
-	GSList *region_list;
-	GSList *object_list;
-	//int pid;
-	/* FIXME... */
-};
-
 typedef struct DVBSubObjectDisplay {
 	/* FIXME: Use more correct sizes */
 	int object_id;
@@ -71,6 +62,15 @@ typedef struct DVBSubObject {
 	struct DVBSubObject *next;
 } DVBSubObject;
 
+typedef struct DVBSubRegionDisplay { /* FIXME: Figure out if this structure is only used temporarily in page_segment parser, or also more */
+	int region_id;
+
+	int x_pos;
+	int y_pos;
+
+	struct DVBSubRegionDisplay *next;
+} DVBSubRegionDisplay;
+
 typedef struct DVBSubRegion
 {
 	guint8 id;
@@ -87,6 +87,17 @@ typedef struct DVBSubRegion
 
 	DVBSubObjectDisplay *display_list;
 } DVBSubRegion;
+
+typedef struct _DvbSubPrivate DvbSubPrivate;
+struct _DvbSubPrivate
+{
+	guint8 page_time_out;
+	GSList *region_list;
+	GSList *object_list;
+	/* FIXME... */
+	int display_list_size;
+	DVBSubRegionDisplay *display_list;
+};
 
 #define DVB_SUB_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), DVB_TYPE_SUB, DvbSubPrivate))
 
@@ -129,6 +140,12 @@ delete_region_display_list (DvbSub *dvb_sub, DVBSubRegion *region)
 }
 
 static void
+delete_state(DvbSub *dvb_sub)
+{
+	/* FIXME: Implement */
+}
+
+static void
 dvb_sub_init (DvbSub *self)
 {
 	DvbSubPrivate *priv;
@@ -138,6 +155,8 @@ dvb_sub_init (DvbSub *self)
 	/* TODO: Add initialization code here */
 	/* FIXME: Do we have a reason to initiate the members to zero, or are we guaranteed that anyway? */
 	priv->region_list = NULL;
+	priv->object_list = NULL;
+	priv->page_time_out = 0; /* FIXME: Maybe 255 instead? */
 }
 
 static void
@@ -162,46 +181,81 @@ dvb_sub_class_init (DvbSubClass *klass)
 }
 
 static void
-_dvb_sub_parse_page_composition (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint buf_size) /* FIXME: Use guint for buf_size here and in many other places? */
+_dvb_sub_parse_page_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint buf_size) /* FIXME: Use guint for buf_size here and in many other places? */
 {
-	int i;
-	unsigned int processed_len;
+	DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
+	DVBSubRegionDisplay *display;
+	DVBSubRegionDisplay *tmp_display_list, **tmp_ptr;
+
+	const guint8 *buf_end = buf + buf_size;
+	guint8 region_id;
+	guint8 page_state;
+
 	static int counter = 0;
-	static gchar *page_state[] = {
+	static gchar *page_state_str[] = {
 		"Normal case",
 		"ACQUISITION POINT",
 		"Mode Change",
 		"RESERVED"
 	};
 
+	if (buf_size < 1)
+		return;
+
+	priv->page_time_out = *buf++;
+	page_state = ((*buf++) >> 2) & 3;
+
 	++counter;
-	g_print ("PAGE COMPOSITION %d: page_id = %u, length = %d; content is:\nPAGE COMPOSITION %d: ", counter, page_id, buf_size, counter);
-	for (i = 0; i < buf_size; ++i)
-		g_print ("0x%x ", buf[i]);
-	g_print("\n");
+	g_print ("PAGE COMPOSITION %d: page_id = %u, length = %d, page_time_out = %u seconds, page_state = %s\nm",
+	         counter, page_id, buf_size, priv->page_time_out, page_state_str[page_state]);
 
-	g_print ("PAGE COMPOSITION %d: Page timeout = %u seconds\n", counter, buf[0]);
-	g_print ("PAGE COMPOSITION %d: page version number = 0x%x (rolling counter from 0x0 to 0xf and then wraparound)\n", counter, (buf[1] >> 4) & 0xf);
-	g_print ("PAGE COMPOSITION %d: page_state = %s\n", counter, page_state[(buf[1] >> 2) & 0x3]);
-	g_print ("PAGE COMPOSITION %d: Reserved = 0x%x\n", counter, buf[1] & 0x3);
+	if (page_state == 2) { /* Mode change */
+		delete_state (dvb_sub);
+	}
 
-	processed_len = 2;
-	while (processed_len < buf_size) {
-		if (buf_size - processed_len < 6) {
-			g_warning ("PAGE COMPOSITION %d: Not enough bytes for a region block! 6 needed, but only have %d left in this page composition segment", counter, buf_size - processed_len);
-			return;
+	tmp_display_list = priv->display_list;
+	priv->display_list = NULL;
+	priv->display_list_size = 0;
+
+	while (buf + 5 < buf_end) {
+		region_id = *buf++;
+		buf += 1;
+
+		display = tmp_display_list;
+		tmp_ptr = &tmp_display_list;
+
+		while (display && display->region_id != region_id) {
+			tmp_ptr = &display->next;
+			display = display->next;
 		}
 
-		g_print ("PAGE COMPOSITION %d: REGION information: ID = %u, address = %ux%u  (reserved value that we don't care was 0x%x)\n", counter,
-		          buf[processed_len],
-		         (buf[processed_len + 2] << 8) | buf[processed_len + 3],
-		         (buf[processed_len + 4] << 8) | buf[processed_len + 5],
-		          buf[processed_len + 1]
-		        );
+		if (!display)
+			display = g_slice_new0(DVBSubRegionDisplay);
 
-		processed_len += 6;
+		display->region_id = region_id;
+
+		display->x_pos = READ_UINT16_BE (buf);
+		buf += 2;
+		display->y_pos = READ_UINT16_BE (buf);
+		buf += 2;
+
+		*tmp_ptr = display->next;
+
+		display->next = priv->display_list;
+		priv->display_list = display;
+		priv->display_list_size++;
+
+		g_print ("PAGE COMPOSITION %d: REGION information: ID = %u, address = %ux%u\n", counter,
+		          region_id, display->x_pos, display->y_pos);
 	}
-	/* TODO */
+
+	while (tmp_display_list) {
+		display = tmp_display_list;
+
+		tmp_display_list = display->next;
+
+		g_slice_free (DVBSubRegionDisplay, display);
+	}
 }
 
 static void
@@ -522,7 +576,7 @@ dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8* data, gint len)
 		switch (segment_type) {
 			case DVB_SUB_SEGMENT_PAGE_COMPOSITION:
 				g_print ("Page composition segment at buffer pos %u\n", pos);
-				_dvb_sub_parse_page_composition (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
+				_dvb_sub_parse_page_segment (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
 				break;
 			case DVB_SUB_SEGMENT_REGION_COMPOSITION:
 				g_print ("Region composition segment at buffer pos %u\n", pos);
