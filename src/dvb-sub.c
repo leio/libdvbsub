@@ -34,6 +34,7 @@
 #include <string.h> /* memset */
 
 /* FIXME: Are we waiting for an acquisition point before trying to do things? */
+/* FIXME: In the end convert some of the guint8/16 (especially stack variables) back to gint for access efficiency */
 
 typedef struct DVBSubObjectDisplay {
 	/* FIXME: Use more correct sizes */
@@ -106,6 +107,12 @@ G_DEFINE_TYPE (DvbSub, dvb_sub, G_TYPE_OBJECT);
 #define READ_UINT16_BE(data) \
 	( (((guint16) (((guint8 *) (data))[0])) << (8)) | \
 	  (((guint16) (((guint8 *) (data))[1]))) )
+
+typedef enum
+{
+	TOP_FIELD = 0,
+	BOTTOM_FIELD = 1
+} DvbSubPixelDataSubBlockFieldType;
 
 static DVBSubObject *
 get_object (DvbSub *dvb_sub, guint16 object_id)
@@ -382,37 +389,213 @@ _dvb_sub_parse_clut_definition (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, g
 	/* TODO */
 }
 
+static int
+_dvb_sub_read_2bit_string(guint8 *destbuf, gint dbuf_len,
+                          const guint8 **srcbuf, gint buf_size,
+                          guint8 non_mod, guint8 *map_table)
+{
+	g_warning ("Inside %s", __PRETTY_FUNCTION__);
+	/* TODO */
+	return dbuf_len;
+}
+
+static int
+_dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
+                          const guint8 **srcbuf, gint buf_size,
+                          guint8 non_mod, guint8 *map_table)
+{
+	g_warning ("Inside %s", __PRETTY_FUNCTION__);
+	/* TODO */
+	return dbuf_len;
+}
+
+static int
+_dvb_sub_read_8bit_string(guint8 *destbuf, gint dbuf_len,
+                          const guint8 **srcbuf, gint buf_size,
+                          guint8 non_mod, guint8 *map_table)
+{
+	g_warning ("Inside %s", __PRETTY_FUNCTION__);
+	/* TODO */
+	return dbuf_len;
+}
+
+static void
+_dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
+                                const guint8 *buf, gint buf_size,
+                                DvbSubPixelDataSubBlockFieldType top_bottom,
+                                guint8 non_mod)
+{
+	DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
+
+	DVBSubRegion *region = get_region(dvb_sub, display->region_id);
+	const guint8 *buf_end = buf + buf_size;
+	guint8 *pbuf;
+	int x_pos, y_pos;
+	int i;
+
+	guint8 map2to4[] = { 0x0,  0x7,  0x8,  0xf};
+	guint8 map2to8[] = {0x00, 0x77, 0x88, 0xff};
+	guint8 map4to8[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+	                    0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
+	guint8 *map_table;
+
+	g_print ("DVB pixel block size %d, %s field:\n", buf_size,
+	         top_bottom ? "bottom" : "top");
+
+#ifdef DEBUG_PACKET_CONTENTS
+	for (i = 0; i < buf_size; i++) {
+		if (i % 16 == 0)
+			g_print ("0x%p: ", buf+i);
+
+		g_print ("%02x ", buf[i]);
+		if (i % 16 == 15)
+			g_print ("\n");
+	}
+
+	if (i % 16)
+		g_print ("\n");
+#endif
+
+	if (region == 0)
+		return;
+
+	pbuf = region->pbuf;
+
+	x_pos = display->x_pos;
+	y_pos = display->y_pos;
+
+	if ((y_pos & 1) != top_bottom)
+		y_pos++;
+
+	while (buf < buf_end) {
+		if (x_pos > region->width || y_pos > region->height) {
+			g_warning ("Invalid object location!\n"); /* FIXME: Be more verbose */
+			return;
+		}
+
+		switch (*buf++) {
+			case 0x10:
+				if (region->depth == 8)
+					map_table = map2to8;
+				else if (region->depth == 4)
+					map_table = map2to4;
+				else
+					map_table = NULL;
+
+				x_pos += _dvb_sub_read_2bit_string(pbuf + (y_pos * region->width) + x_pos,
+				                                   region->width - x_pos, &buf, buf_size,
+				                                   non_mod, map_table);
+				break;
+			case 0x11:
+				if (region->depth < 4) {
+					g_warning ("4-bit pixel string in %d-bit region!\n", region->depth);
+					return;
+				}
+
+				if (region->depth == 8)
+					map_table = map4to8;
+				else
+					map_table = NULL;
+
+				x_pos += _dvb_sub_read_4bit_string(pbuf + (y_pos * region->width) + x_pos,
+				                                   region->width - x_pos, &buf, buf_size,
+				                                   non_mod, map_table);
+				break;
+			case 0x12:
+				if (region->depth < 8) {
+					g_warning ("8-bit pixel string in %d-bit region!\n", region->depth);
+					return;
+				}
+
+				x_pos += _dvb_sub_read_8bit_string(pbuf + (y_pos * region->width) + x_pos,
+				                                   region->width - x_pos, &buf, buf_size,
+				                                   non_mod, NULL);
+				break;
+
+			case 0x20:
+				map2to4[0] = (*buf) >> 4;
+				map2to4[1] = (*buf++) & 0xf;
+				map2to4[2] = (*buf) >> 4;
+				map2to4[3] = (*buf++) & 0xf;
+				break;
+			case 0x21:
+				for (i = 0; i < 4; i++)
+					map2to8[i] = *buf++;
+				break;
+			case 0x22:
+				for (i = 0; i < 16; i++)
+					map4to8[i] = *buf++;
+				break;
+
+			case 0xf0:
+				x_pos = display->x_pos;
+				y_pos += 2;
+				break;
+			default:
+				g_warning ("Unknown/unsupported pixel block 0x%x", *(buf-1));
+		}
+	}
+}
+
 static void
 _dvb_sub_parse_object_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint buf_size)
 {
-	static int counter = 0;
-	static gchar *coding_method[] = {
-		"PIXELS",
-		"STRING",
-		"Reserved (0x02)",
-		"Reserved (0x03)"
-	};
+	DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
 
-	guint16 object_id;
+	const guint8 *buf_end = buf + buf_size;
+	guint object_id;
+	DVBSubObject *object;
 
-	++counter;
-#if DEBUG_CONTENTS
-	{
-		int i;
-		g_print ("OBJECT DATA %d: page_id = %u, length = %d; content is:\nOBJECT DATA %d (content): ", counter, page_id, buf_size, counter);
-		for (i = 0; i < buf_size; ++i)
-			g_print ("0x%x ", buf[i]);
-		g_print("\n");
-	}
-#endif
+	guint8 coding_method, non_modifying_color;
 
 	object_id = READ_UINT16_BE (buf);
-	g_print ("OBJECT DATA %d: object_id = %u (0x%x 0x%x)\n", counter, object_id, buf[0], buf[1]);
-	g_print ("OBJECT DATA %d: object version number = 0x%x (rolling counter from 0x0 to 0xf and then wraparound)\n", counter, (buf[2] >> 4) & 0xf);
-	g_print ("OBJECT DATA %d: coding_method = %s\n", counter, coding_method[(buf[1] >> 2) & 0x3]);
-	g_print ("OBJECT DATA %d: Reserved = 0x%x\n", counter, buf[1] & 0x3);
+	buf += 2;
 
-	/* TODO */
+	object = get_object (dvb_sub, object_id);
+
+	if (!object) {
+		g_warning ("Nothing known about object with ID %u yet inside parse_object_segment, bailing out", object_id);
+		return;
+	}
+
+	coding_method = ((*buf) >> 2) & 3;
+	non_modifying_color = ((*buf++) >> 1) & 1;
+
+	if (coding_method == 0) {
+		const guint8 *block;
+		DVBSubObjectDisplay *display;
+		guint16 top_field_len, bottom_field_len;
+
+		top_field_len = READ_UINT16_BE (buf);
+		buf += 2;
+		bottom_field_len = READ_UINT16_BE (buf);
+		buf += 2;
+
+		if (buf + top_field_len + bottom_field_len > buf_end) {
+			g_warning ("%s: Field data size too large\n", __PRETTY_FUNCTION__);
+			return;
+		}
+
+		for (display = object->display_list; display; display = display->object_list_next) {
+			block = buf;
+
+			_dvb_sub_parse_pixel_data_block(dvb_sub, display, block, top_field_len, TOP_FIELD,
+			                                non_modifying_color);
+
+			if (bottom_field_len > 0)
+				block = buf + top_field_len;
+			else
+				bottom_field_len = top_field_len;
+
+			_dvb_sub_parse_pixel_data_block(dvb_sub, display, block, bottom_field_len, BOTTOM_FIELD,
+			                                non_modifying_color);
+		}
+
+	} else if (coding_method == 1) {
+		g_warning ("'a string of characters' coding method not supported (yet?)!");
+	} else {
+		g_warning ("%s: Unknown object coding 0x%x\n", __PRETTY_FUNCTION__, coding_method);
+	}
 }
 
 static void
