@@ -31,17 +31,102 @@
  */
 
 #include "dvb-sub.h"
+#include <string.h> /* memset */
+
+/* FIXME: Are we waiting for an acquisition point before trying to do things? */
 
 typedef struct _DvbSubPrivate DvbSubPrivate;
 struct _DvbSubPrivate
 {
-	int pid;
+	GSList *region_list;
+	GSList *object_list;
+	//int pid;
 	/* FIXME... */
 };
+
+typedef struct DVBSubObjectDisplay {
+	/* FIXME: Use more correct sizes */
+	int object_id;
+	int region_id;
+
+	int x_pos;
+	int y_pos;
+
+	int fgcolor;
+	int bgcolor;
+
+	/* FIXME: Should we use GSList? The relating interaction and pointer assigment is quite complex and perhaps unsuited for a plain GSList anyway */
+	struct DVBSubObjectDisplay *region_list_next;
+	struct DVBSubObjectDisplay *object_list_next;
+} DVBSubObjectDisplay;
+
+typedef struct DVBSubObject {
+	/* FIXME: Use more correct sizes */
+	int id;
+
+	int type;
+
+	/* FIXME: Should we use GSList? */
+	DVBSubObjectDisplay *display_list;
+	struct DVBSubObject *next;
+} DVBSubObject;
+
+typedef struct DVBSubRegion
+{
+	guint8 id;
+	guint16 width;
+	guint16 height;
+	guint8 depth;/* If we want to make this a guint8, then need to ensure it isn't wrap around with reserved values in region handling code */
+
+	guint8 clut;
+	guint8 bgcolor;
+
+	/* FIXME: Validate these fields existence and exact types */
+	guint8 *pbuf;
+	int buf_size;
+
+	DVBSubObjectDisplay *display_list;
+} DVBSubRegion;
 
 #define DVB_SUB_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), DVB_TYPE_SUB, DvbSubPrivate))
 
 G_DEFINE_TYPE (DvbSub, dvb_sub, G_TYPE_OBJECT);
+
+#define READ_UINT16_BE(data) \
+	( (((guint16) (((guint8 *) (data))[0])) << (8)) | \
+	  (((guint16) (((guint8 *) (data))[1]))) )
+
+static DVBSubObject *
+get_object (DvbSub *dvb_sub, guint16 object_id)
+{
+	const DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
+	GSList *list = priv->object_list;
+
+	while (list && ((DVBSubObject *)list->data)->id != object_id) {
+		list = g_slist_next (list);
+	}
+
+	return list ? (DVBSubObject *)list->data : NULL;
+}
+
+static DVBSubRegion*
+get_region (DvbSub *dvb_sub, guint8 region_id)
+{
+	const DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
+	GSList *list = priv->region_list;
+
+	while (list && ((DVBSubRegion *)list->data)->id != region_id) {
+		list = g_slist_next (list);
+	}
+
+	return list ? (DVBSubRegion *)list->data : NULL;
+}
+
+static void
+delete_region_display_list (DvbSub *dvb_sub, DVBSubRegion *region)
+{
+	/* FIXME: Fill in with proper object data deletion after the creation is done... */
+}
 
 static void
 dvb_sub_init (DvbSub *self)
@@ -51,6 +136,8 @@ dvb_sub_init (DvbSub *self)
 	self->private_data = priv = DVB_SUB_GET_PRIVATE (self);
 
 	/* TODO: Add initialization code here */
+	/* FIXME: Do we have a reason to initiate the members to zero, or are we guaranteed that anyway? */
+	priv->region_list = NULL;
 }
 
 static void
@@ -59,6 +146,7 @@ dvb_sub_finalize (GObject *object)
 	DvbSub *self = DVB_SUB (object);
 	DvbSubPrivate *priv = (DvbSubPrivate *)self->private_data;
 	/* TODO: Add deinitalization code here */
+	/* FIXME: Clear up region_list contents */
 
 	G_OBJECT_CLASS (dvb_sub_parent_class)->finalize (object);
 }
@@ -117,9 +205,120 @@ _dvb_sub_parse_page_composition (DvbSub *dvb_sub, guint16 page_id, guint8 *data,
 }
 
 static void
-_dvb_sub_parse_region_composition (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len)
+_dvb_sub_parse_region_composition (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint len)
 {
-	/* TODO */
+	const guint8 *buf_end = buf + len;
+	guint8 region_id;
+	guint16 object_id;
+	gboolean fill;
+	DVBSubRegion *region;
+	DVBSubObject *object;
+	DVBSubObjectDisplay *object_display;
+	DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
+
+	if (len < 10)
+		return;
+
+	region_id = *buf++;
+
+	region = get_region (dvb_sub, region_id);
+
+	if (!region) { /* Create a new region */
+		region = g_slice_new0 (DVBSubRegion);
+		region->id = region_id;
+		priv->region_list = g_slist_prepend (priv->region_list, region);
+	}
+
+	fill = ((*buf++) >> 3) & 1;
+
+	region->width = READ_UINT16_BE (buf);
+	buf += 2;
+	region->height = READ_UINT16_BE (buf);
+	buf += 2;
+
+	if (region->width * region->height != region->buf_size) { /* FIXME: Read closer from spec what happens when dimensions change */
+		if (region->pbuf)
+			g_free (region->pbuf);
+
+		region->buf_size = region->width * region->height;
+
+		region->pbuf = g_malloc (region->buf_size); /* TODO: We can probably use GSlice here if careful about freeing while buf_size still records the correct size */
+
+		fill = 1; /* FIXME: Validate from spec that fill is forced on (in the following codes context) when dimensions change */
+	}
+
+	region->depth = 1 << (((*buf++) >> 2) & 7);
+	if (region->depth < 2 || region->depth > 8) {
+		g_warning ("region depth %d is invalid\n", region->depth);
+		region->depth = 4; /* FIXME: Check from spec this is the default? */
+	}
+
+	region->clut = *buf++;
+
+	if (region->depth == 8)
+		region->bgcolor = *buf++;
+	else {
+		buf += 1;
+
+		if (region->depth == 4)
+			region->bgcolor = (((*buf++) >> 4) & 15);
+		else
+			region->bgcolor = (((*buf++) >> 2) & 3);
+	}
+
+	g_print ("REGION DATA: id = %u, (%ux%u)@%u-bit\n", region_id, region->width, region->height, region->depth);
+
+	if (fill) {
+		memset (region->pbuf, region->bgcolor, region->buf_size);
+		g_print ("REGION DATA: Filling region (%u) with bgcolor = %u\n", region->id, region->bgcolor);
+	}
+
+	delete_region_display_list (dvb_sub, region); /* Delete the region display list for current region - FIXME: why? */
+
+	while (buf + 6 <= buf_end) {
+		object_id = READ_UINT16_BE (buf);
+		buf += 2;
+
+		object = get_object(dvb_sub, object_id);
+
+		if (!object) {
+			object = g_slice_new0 (DVBSubObject);
+
+			object->id = object_id;
+			priv->object_list = g_slist_prepend (priv->object_list, object);
+		}
+
+		object->type = (*buf) >> 6;
+
+		object_display = g_slice_new0 (DVBSubObjectDisplay);
+
+		object_display->object_id = object_id;
+		object_display->region_id = region_id;
+
+		object_display->x_pos = READ_UINT16_BE (buf) & 0xfff;
+		buf += 2;
+		object_display->y_pos = READ_UINT16_BE (buf) & 0xfff;
+		buf += 2;
+
+		if ((object->type == 1 || object->type == 2) && buf + 2 <= buf_end) {
+			object_display->fgcolor = *buf++;
+			object_display->bgcolor = *buf++;
+		}
+
+		object_display->region_list_next = region->display_list;
+		region->display_list = object_display;
+
+		object_display->object_list_next = object->display_list;
+		object->display_list = object_display;
+
+		g_print ("REGION DATA: object_id = %u, region_id = %u, pos = %ux%u, obj_type = %u",
+		         object->id, region->id, object_display->x_pos, object_display->y_pos,
+		         object->type);
+		if (object->type == 1 || object->type == 2)
+			g_print (", fgcolor = %u, bgcolor = %u\n", object_display->fgcolor, object_display->bgcolor);
+		else
+			g_print ("\n");
+	}
 }
 
 static void
@@ -132,7 +331,6 @@ static void
 _dvb_sub_parse_object_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *data, gint len)
 {
 	static int counter = 0;
-	int i;
 	static gchar *coding_method[] = {
 		"PIXELS",
 		"STRING",
@@ -143,10 +341,15 @@ _dvb_sub_parse_object_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *data, g
 	guint16 object_id;
 
 	++counter;
-	g_print ("OBJECT DATA %d: page_id = %u, length = %d; content is:\nOBJECT DATA %d (content): ", counter, page_id, len, counter);
-	for (i = 0; i < len; ++i)
-		g_print ("0x%x ", data[i]);
-	g_print("\n");
+#if DEBUG_CONTENTS
+	{
+		int i;
+		g_print ("OBJECT DATA %d: page_id = %u, length = %d; content is:\nOBJECT DATA %d (content): ", counter, page_id, len, counter);
+		for (i = 0; i < len; ++i)
+			g_print ("0x%x ", data[i]);
+		g_print("\n");
+	}
+#endif
 
 	object_id = (data[0] << 8) | data[1];
 	g_print ("OBJECT DATA %d: object_id = %u (0x%x 0x%x)\n", counter, object_id, data[0], data[1]);
