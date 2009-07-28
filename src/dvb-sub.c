@@ -205,16 +205,17 @@ _dvb_sub_parse_page_composition (DvbSub *dvb_sub, guint16 page_id, guint8 *data,
 }
 
 static void
-_dvb_sub_parse_region_composition (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint len)
+_dvb_sub_parse_region_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint len)
 {
+	DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
+
 	const guint8 *buf_end = buf + len;
 	guint8 region_id;
 	guint16 object_id;
-	gboolean fill;
 	DVBSubRegion *region;
 	DVBSubObject *object;
 	DVBSubObjectDisplay *object_display;
-	DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
+	gboolean fill;
 
 	if (len < 10)
 		return;
@@ -525,7 +526,7 @@ dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8* data, gint len)
 				break;
 			case DVB_SUB_SEGMENT_REGION_COMPOSITION:
 				g_print ("Region composition segment at buffer pos %u\n", pos);
-				_dvb_sub_parse_region_composition (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
+				_dvb_sub_parse_region_segment (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
 				break;
 			case DVB_SUB_SEGMENT_CLUT_DEFINITION:
 				g_print ("CLUT definition segment at buffer pos %u\n", pos);
