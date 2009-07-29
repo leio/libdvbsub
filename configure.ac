@@ -11,7 +11,7 @@ AC_HEADER_STDC
 
 AM_PROG_LIBTOOL
 
-PKG_CHECK_MODULES(LIBDVBSUB, [glib-2.0 gobject-2.0])
+PKG_CHECK_MODULES(LIBDVBSUB, [glib-2.0 gobject-2.0 gstreamer-0.10])
 
 
 

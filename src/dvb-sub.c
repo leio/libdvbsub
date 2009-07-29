@@ -32,6 +32,7 @@
 
 #include "dvb-sub.h"
 #include <string.h> /* memset */
+#include <gst/gstutils.h> /* GST_READ_UINT16_BE */
 
 /* FIXME: Are we waiting for an acquisition point before trying to do things? */
 /* FIXME: In the end convert some of the guint8/16 (especially stack variables) back to gint for access efficiency */
@@ -103,10 +104,6 @@ struct _DvbSubPrivate
 #define DVB_SUB_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), DVB_TYPE_SUB, DvbSubPrivate))
 
 G_DEFINE_TYPE (DvbSub, dvb_sub, G_TYPE_OBJECT);
-
-#define READ_UINT16_BE(data) \
-	( (((guint16) (((guint8 *) (data))[0])) << (8)) | \
-	  (((guint16) (((guint8 *) (data))[1]))) )
 
 typedef enum
 {
@@ -241,9 +238,9 @@ _dvb_sub_parse_page_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint
 
 		display->region_id = region_id;
 
-		display->x_pos = READ_UINT16_BE (buf);
+		display->x_pos = GST_READ_UINT16_BE (buf);
 		buf += 2;
-		display->y_pos = READ_UINT16_BE (buf);
+		display->y_pos = GST_READ_UINT16_BE (buf);
 		buf += 2;
 
 		*tmp_ptr = display->next;
@@ -293,9 +290,9 @@ _dvb_sub_parse_region_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 
 	fill = ((*buf++) >> 3) & 1;
 
-	region->width = READ_UINT16_BE (buf);
+	region->width = GST_READ_UINT16_BE (buf);
 	buf += 2;
-	region->height = READ_UINT16_BE (buf);
+	region->height = GST_READ_UINT16_BE (buf);
 	buf += 2;
 
 	if (region->width * region->height != region->buf_size) { /* FIXME: Read closer from spec what happens when dimensions change */
@@ -338,7 +335,7 @@ _dvb_sub_parse_region_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 	delete_region_display_list (dvb_sub, region); /* Delete the region display list for current region - FIXME: why? */
 
 	while (buf + 6 <= buf_end) {
-		object_id = READ_UINT16_BE (buf);
+		object_id = GST_READ_UINT16_BE (buf);
 		buf += 2;
 
 		object = get_object(dvb_sub, object_id);
@@ -357,9 +354,9 @@ _dvb_sub_parse_region_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 		object_display->object_id = object_id;
 		object_display->region_id = region_id;
 
-		object_display->x_pos = READ_UINT16_BE (buf) & 0xfff;
+		object_display->x_pos = GST_READ_UINT16_BE (buf) & 0xfff;
 		buf += 2;
-		object_display->y_pos = READ_UINT16_BE (buf) & 0xfff;
+		object_display->y_pos = GST_READ_UINT16_BE (buf) & 0xfff;
 		buf += 2;
 
 		if ((object->type == 1 || object->type == 2) && buf + 2 <= buf_end) {
@@ -558,7 +555,7 @@ _dvb_sub_parse_object_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 
 	guint8 coding_method, non_modifying_color;
 
-	object_id = READ_UINT16_BE (buf);
+	object_id = GST_READ_UINT16_BE (buf);
 	buf += 2;
 
 	object = get_object (dvb_sub, object_id);
@@ -576,9 +573,9 @@ _dvb_sub_parse_object_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 		DVBSubObjectDisplay *display;
 		guint16 top_field_len, bottom_field_len;
 
-		top_field_len = READ_UINT16_BE (buf);
+		top_field_len = GST_READ_UINT16_BE (buf);
 		buf += 2;
-		bottom_field_len = READ_UINT16_BE (buf);
+		bottom_field_len = GST_READ_UINT16_BE (buf);
 		buf += 2;
 
 		if (buf + top_field_len + bottom_field_len > buf_end) {
