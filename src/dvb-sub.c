@@ -34,9 +34,26 @@
 #include <string.h> /* memset */
 #include <gst/gstutils.h> /* GST_READ_UINT16_BE */
 #include <gst/base/gstbitreader.h> /* GstBitReader */
+#include "ffmpeg-colorspace.h" /* YUV_TO_RGB1_CCIR */
 
 /* FIXME: Are we waiting for an acquisition point before trying to do things? */
 /* FIXME: In the end convert some of the guint8/16 (especially stack variables) back to gint for access efficiency */
+
+#define MAX_NEG_CROP 1024
+static guint8 ff_cropTbl[256 + 2 * MAX_NEG_CROP] = { 0, };
+
+#define cm (ff_cropTbl + MAX_NEG_CROP)
+#define RGBA(r,g,b,a) (((a) << 24) | ((r) << 16) | ((g) << 8) | (b))
+
+typedef struct DVBSubCLUT {
+    int id; /* default_clut uses -1 for this, so guint8 isn't fine without adaptations first */
+
+    guint32 clut4[4];
+    guint32 clut16[16];
+    guint32 clut256[256];
+} DVBSubCLUT;
+
+static DVBSubCLUT default_clut;
 
 typedef struct DVBSubObjectDisplay {
 	/* FIXME: Use more correct sizes */
@@ -56,7 +73,7 @@ typedef struct DVBSubObjectDisplay {
 
 typedef struct DVBSubObject {
 	/* FIXME: Use more correct sizes */
-	int id;
+	int id; /* FIXME: Use guint8 after checking it's fine in all code using it */
 
 	int type;
 
@@ -96,6 +113,7 @@ struct _DvbSubPrivate
 {
 	guint8 page_time_out;
 	GSList *region_list;
+	GSList *clut_list;
 	GSList *object_list;
 	/* FIXME... */
 	int display_list_size;
@@ -123,6 +141,19 @@ get_object (DvbSub *dvb_sub, guint16 object_id)
 	}
 
 	return list ? (DVBSubObject *)list->data : NULL;
+}
+
+static DVBSubCLUT *
+get_clut (DvbSub *dvb_sub, gint clut_id)
+{
+	const DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
+	GSList *list = priv->clut_list;
+
+	while (list && ((DVBSubCLUT *)list->data)->id != clut_id) {
+		list = g_slist_next (list);
+	}
+
+	return list ? (DVBSubCLUT *)list->data : NULL;
 }
 
 static DVBSubRegion*
@@ -175,14 +206,93 @@ dvb_sub_finalize (GObject *object)
 	G_OBJECT_CLASS (dvb_sub_parent_class)->finalize (object);
 }
 
+/* init static data necessary for ffmpeg-colorspace conversion */
+static void
+dsputil_static_init (void)
+{
+	int i;
+
+	for (i = 0; i < 256; i++)
+		ff_cropTbl[i + MAX_NEG_CROP] = i;
+	for (i = 0; i < MAX_NEG_CROP; i++) {
+		ff_cropTbl[i] = 0;
+		ff_cropTbl[i + MAX_NEG_CROP + 256] = 255;
+	}
+}
+
 static void
 dvb_sub_class_init (DvbSubClass *klass)
 {
+	int i, r, g, b, a = 0;
 	GObjectClass* object_class = (GObjectClass *)klass;
 
 	object_class->finalize = dvb_sub_finalize;
 
 	g_type_class_add_private (klass, sizeof (DvbSubPrivate));
+
+	dsputil_static_init (); /* Initializes ff_cropTbl table, used in YUV_TO_RGB conversion */
+
+	/* Initialize the static default_clut structure, from which other clut
+	 * structures are initialized from (to start off with default CLUTs
+	 * as defined in the specification). */
+	default_clut.id = -1;
+
+	default_clut.clut4[0] = RGBA(  0,   0,   0,   0);
+	default_clut.clut4[1] = RGBA(255, 255, 255, 255);
+	default_clut.clut4[2] = RGBA(  0,   0,   0, 255);
+	default_clut.clut4[3] = RGBA(127, 127, 127, 255);
+
+	default_clut.clut16[0] = RGBA(  0,   0,   0,   0);
+	for (i = 1; i < 16; i++) {
+		if (i < 8) {
+			r = (i & 1) ? 255 : 0;
+			g = (i & 2) ? 255 : 0;
+			b = (i & 4) ? 255 : 0;
+		} else {
+			r = (i & 1) ? 127 : 0;
+			g = (i & 2) ? 127 : 0;
+			b = (i & 4) ? 127 : 0;
+		}
+		default_clut.clut16[i] = RGBA(r, g, b, 255);
+	}
+
+	default_clut.clut256[0] = RGBA(  0,   0,   0,   0);
+	for (i = 1; i < 256; i++) {
+		if (i < 8) {
+			r = (i & 1) ? 255 : 0;
+			g = (i & 2) ? 255 : 0;
+			b = (i & 4) ? 255 : 0;
+			a = 63;
+		} else {
+			switch (i & 0x88) {
+				case 0x00:
+					r = ((i & 1) ? 85 : 0) + ((i & 0x10) ? 170 : 0);
+					g = ((i & 2) ? 85 : 0) + ((i & 0x20) ? 170 : 0);
+					b = ((i & 4) ? 85 : 0) + ((i & 0x40) ? 170 : 0);
+					a = 255;
+					break;
+				case 0x08:
+					r = ((i & 1) ? 85 : 0) + ((i & 0x10) ? 170 : 0);
+					g = ((i & 2) ? 85 : 0) + ((i & 0x20) ? 170 : 0);
+					b = ((i & 4) ? 85 : 0) + ((i & 0x40) ? 170 : 0);
+					a = 127;
+					break;
+				case 0x80:
+					r = 127 + ((i & 1) ? 43 : 0) + ((i & 0x10) ? 85 : 0);
+					g = 127 + ((i & 2) ? 43 : 0) + ((i & 0x20) ? 85 : 0);
+					b = 127 + ((i & 4) ? 43 : 0) + ((i & 0x40) ? 85 : 0);
+					a = 255;
+					break;
+				case 0x88:
+					r = ((i & 1) ? 43 : 0) + ((i & 0x10) ? 85 : 0);
+					g = ((i & 2) ? 43 : 0) + ((i & 0x20) ? 85 : 0);
+					b = ((i & 4) ? 43 : 0) + ((i & 0x40) ? 85 : 0);
+					a = 255;
+					break;
+			}
+		}
+		default_clut.clut256[i] = RGBA(r, g, b, a);
+	}
 }
 
 static void
@@ -211,7 +321,7 @@ _dvb_sub_parse_page_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint
 	page_state = ((*buf++) >> 2) & 3;
 
 	++counter;
-	g_print ("PAGE COMPOSITION %d: page_id = %u, length = %d, page_time_out = %u seconds, page_state = %s\nm",
+	g_print ("PAGE COMPOSITION %d: page_id = %u, length = %d, page_time_out = %u seconds, page_state = %s\n",
 	         counter, page_id, buf_size, priv->page_time_out, page_state_str[page_state]);
 
 	if (page_state == 2) { /* Mode change */
@@ -382,9 +492,78 @@ _dvb_sub_parse_region_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 }
 
 static void
-_dvb_sub_parse_clut_definition (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint buf_size)
+_dvb_sub_parse_clut_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint buf_size)
 {
-	/* TODO */
+	DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
+
+	const guint8 *buf_end = buf + buf_size;
+	guint8 clut_id;
+	DVBSubCLUT *clut;
+	int entry_id, depth , full_range;
+	int y, cr, cb, alpha;
+	int r, g, b, r_add, g_add, b_add;
+
+#if 1 //def DEBUG_PACKET_CONTENTS
+	g_print("DVB clut packet:\n");
+	gst_util_dump_mem (buf, buf_size);
+#endif
+
+	clut_id = *buf++;
+	buf += 1;
+
+	clut = get_clut(dvb_sub, clut_id);
+
+	if (!clut) {
+		clut = g_slice_new (DVBSubCLUT);
+
+		memcpy(clut, &default_clut, sizeof(DVBSubCLUT));
+
+		clut->id = clut_id;
+
+		priv->clut_list = g_slist_prepend (priv->clut_list, clut);
+	}
+
+	while (buf + 4 < buf_end) {
+		entry_id = *buf++;
+
+		depth = (*buf) & 0xe0;
+
+		if (depth == 0) {
+			g_warning ("Invalid clut depth 0x%x!", *buf);
+			return;
+		}
+
+		full_range = (*buf++) & 1;
+
+		if (full_range) {
+			y = *buf++;
+			cr = *buf++;
+			cb = *buf++;
+			alpha = *buf++;
+		} else {
+			y = buf[0] & 0xfc;
+			cr = (((buf[0] & 3) << 2) | ((buf[1] >> 6) & 3)) << 4;
+			cb = (buf[1] << 2) & 0xf0;
+			alpha = (buf[1] << 6) & 0xc0;
+
+			buf += 2;
+		}
+
+		if (y == 0)
+			alpha = 0xff;
+
+		YUV_TO_RGB1_CCIR(cb, cr);
+		YUV_TO_RGB2_CCIR(r, g, b, y);
+
+		g_print("CLUT DEFINITION: clut %d := (%d,%d,%d,%d)\n", entry_id, r, g, b, alpha);
+
+		if (depth & 0x80)
+			clut->clut4[entry_id] = RGBA(r,g,b,255 - alpha);
+		if (depth & 0x40)
+			clut->clut16[entry_id] = RGBA(r,g,b,255 - alpha);
+		if (depth & 0x20)
+			clut->clut256[entry_id] = RGBA(r,g,b,255 - alpha);
+	}
 }
 
 static int
@@ -872,7 +1051,7 @@ dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8* data, gint len)
 				break;
 			case DVB_SUB_SEGMENT_CLUT_DEFINITION:
 				g_print ("CLUT definition segment at buffer pos %u\n", pos);
-				_dvb_sub_parse_clut_definition (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
+				_dvb_sub_parse_clut_segment (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
 				break;
 			case DVB_SUB_SEGMENT_OBJECT_DATA:
 				g_print ("Object data segment at buffer pos %u\n", pos);

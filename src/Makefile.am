@@ -13,6 +13,7 @@ bin_PROGRAMS = libdvbsub
 libdvbsub_SOURCES = \
 	main.c     \
 	dvb-sub.h     \
-	dvb-sub.c
+	dvb-sub.c     \
+	ffmpeg-colorspace.h
 
 libdvbsub_LDADD = $(LIBDVBSUB_LIBS)
