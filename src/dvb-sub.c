@@ -440,17 +440,7 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 	         top_bottom ? "bottom" : "top");
 
 #if 1 //def DEBUG_PACKET_CONTENTS
-	for (i = 0; i < buf_size; i++) {
-		if (i % 16 == 0)
-			g_print ("0x%p: ", buf+i);
-
-		g_print ("%02x ", buf[i]);
-		if (i % 16 == 15)
-			g_print ("\n");
-	}
-
-	if (i % 16)
-		g_print ("\n");
+	gst_util_dump_mem (buf, buf_size);
 #endif
 
 	if (region == NULL) {
