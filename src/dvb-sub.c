@@ -442,7 +442,7 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 	g_print ("DVB pixel block size %d, %s field:\n", buf_size,
 	         top_bottom ? "bottom" : "top");
 
-#ifdef DEBUG_PACKET_CONTENTS
+#if 1 //def DEBUG_PACKET_CONTENTS
 	for (i = 0; i < buf_size; i++) {
 		if (i % 16 == 0)
 			g_print ("0x%p: ", buf+i);
@@ -456,8 +456,10 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 		g_print ("\n");
 #endif
 
-	if (region == 0)
+	if (region == NULL) {
+		g_print ("Region is NULL, returning\n");
 		return;
+	}
 
 	pbuf = region->pbuf;
 
@@ -482,6 +484,8 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 				else
 					map_table = NULL;
 
+				/* FIXME: I don't see any guards about buffer size here - buf++ happens with the switch, but size
+				 * FIXME: passed is the global size apparently? */
 				x_pos += _dvb_sub_read_2bit_string(pbuf + (y_pos * region->width) + x_pos,
 				                                   region->width - x_pos, &buf, buf_size,
 				                                   non_mod, map_table);
@@ -497,6 +501,8 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 				else
 					map_table = NULL;
 
+				/* FIXME: I don't see any guards about buffer size here - buf++ happens with the switch, but size
+				 * FIXME: passed is the global size apparently? */
 				x_pos += _dvb_sub_read_4bit_string(pbuf + (y_pos * region->width) + x_pos,
 				                                   region->width - x_pos, &buf, buf_size,
 				                                   non_mod, map_table);
@@ -507,12 +513,16 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 					return;
 				}
 
+				/* FIXME: I don't see any guards about buffer size here - buf++ happens with the switch, but size
+				 * FIXME: passed is the global size apparently? */
 				x_pos += _dvb_sub_read_8bit_string(pbuf + (y_pos * region->width) + x_pos,
 				                                   region->width - x_pos, &buf, buf_size,
 				                                   non_mod, NULL);
 				break;
 
 			case 0x20:
+				/* FIXME: I don't see any guards about buffer size here - buf++ happens with the switch, but
+				 * FIXME: buffer is walked without length checks? */
 				map2to4[0] = (*buf) >> 4;
 				map2to4[1] = (*buf++) & 0xf;
 				map2to4[2] = (*buf) >> 4;
