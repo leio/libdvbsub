@@ -33,6 +33,7 @@
 #include "dvb-sub.h"
 #include <string.h> /* memset */
 #include <gst/gstutils.h> /* GST_READ_UINT16_BE */
+#include <gst/base/gstbitreader.h> /* GstBitReader */
 
 /* FIXME: Are we waiting for an acquisition point before trying to do things? */
 /* FIXME: In the end convert some of the guint8/16 (especially stack variables) back to gint for access efficiency */
@@ -401,9 +402,116 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
                           const guint8 **srcbuf, gint buf_size,
                           guint8 non_mod, guint8 *map_table)
 {
-	g_warning ("Inside %s", __PRETTY_FUNCTION__);
+	g_print ("Inside %s\n", __PRETTY_FUNCTION__);
 	/* TODO */
-	return dbuf_len;
+	GstBitReader gb = GST_BIT_READER_INIT (*srcbuf, buf_size);
+	/* FIXME: Handle FALSE returns from gst_bit_reader_get_* calls? */
+
+	guint32 bits;
+	guint run_length;
+	int pixels_read = 0;
+
+	while (gst_bit_reader_get_remaining (&gb) < (buf_size << 3) && pixels_read < dbuf_len) {
+		gst_bit_reader_get_bits_uint32 (&gb, &bits, 2);
+
+		if (bits) {
+			if (non_mod != 1 || bits != 1) {
+				if (map_table)
+					*destbuf++ = map_table[bits];
+				else
+					*destbuf++ = bits;
+			}
+			pixels_read++;
+		} else {
+			gst_bit_reader_get_bits_uint32 (&gb, &bits, 1);
+			if (bits == 1) {
+				gst_bit_reader_get_bits_uint32 (&gb, &run_length, 3);
+				run_length += 3;
+				gst_bit_reader_get_bits_uint32 (&gb, &bits, 2);;
+
+				if (non_mod == 1 && bits == 1)
+					pixels_read += run_length;
+				else {
+					if (map_table)
+						bits = map_table[bits];
+					while (run_length-- > 0 && pixels_read < dbuf_len) {
+						*destbuf++ = bits;
+						pixels_read++;
+					}
+				}
+			} else {
+				gst_bit_reader_get_bits_uint32 (&gb, &bits, 1);
+				if (bits == 0) {
+					gst_bit_reader_get_bits_uint32 (&gb, &bits, 2);
+					if (bits == 2) {
+						gst_bit_reader_get_bits_uint32 (&gb, &run_length, 4);
+						run_length += 12;
+						gst_bit_reader_get_bits_uint32 (&gb, &bits, 2);
+
+						if (non_mod == 1 && bits == 1)
+							pixels_read += run_length;
+						else {
+							if (map_table)
+								bits = map_table[bits];
+							while (run_length-- > 0 && pixels_read < dbuf_len) {
+								*destbuf++ = bits;
+								pixels_read++;
+							}
+						}
+					} else if (bits == 3) {
+						gst_bit_reader_get_bits_uint32 (&gb, &run_length, 8);
+						run_length += 29;
+						gst_bit_reader_get_bits_uint32 (&gb, &bits, 2);
+
+						if (non_mod == 1 && bits == 1)
+							pixels_read += run_length;
+						else {
+							if (map_table)
+								bits = map_table[bits];
+							while (run_length-- > 0 && pixels_read < dbuf_len) {
+								*destbuf++ = bits;
+								pixels_read++;
+							}
+						}
+					} else if (bits == 1) {
+						pixels_read += 2;
+						if (map_table)
+							bits = map_table[0];
+						else
+							bits = 0;
+						if (pixels_read <= dbuf_len) {
+							*destbuf++ = bits;
+							*destbuf++ = bits;
+						}
+					} else {
+						(*srcbuf) += (gst_bit_reader_get_remaining (&gb) + 7) >> 3;
+						return pixels_read;
+					}
+				} else {
+					if (map_table)
+						bits = map_table[0];
+					else
+						bits = 0;
+					*destbuf++ = bits;
+					pixels_read++;
+				}
+			}
+		}
+	}
+
+#if 1
+	/* FIXME: What is this for? With current ported code it seems to always warn with current test case */
+	gst_bit_reader_get_bits_uint32 (&gb, &bits, 6);
+	if (bits)
+		g_warning ("DVBSub error: line overflow");
+#else /* Original code from libavcodec for reference until the always warning is fixed: */
+	if (get_bits(&gb, 6))
+		g_warning ("DVBSub error: line overflow");
+#endif
+
+	(*srcbuf) += (gst_bit_reader_get_remaining (&gb) + 7) >> 3;
+
+	return pixels_read;
 }
 
 static int
@@ -439,7 +547,7 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 	g_print ("DVB pixel block size %d, %s field:\n", buf_size,
 	         top_bottom ? "bottom" : "top");
 
-#if 1 //def DEBUG_PACKET_CONTENTS
+#ifdef DEBUG_PACKET_CONTENTS
 	gst_util_dump_mem (buf, buf_size);
 #endif
 
