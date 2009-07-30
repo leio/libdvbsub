@@ -651,7 +651,8 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 				else {
 					if (map_table)
 						bits = map_table[bits];
-					g_print ("READ_nBIT_STRING (4): Putting value 0x%x in destbuf %d times\n", bits, run_length);
+					g_print ("READ_nBIT_STRING (4): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]\n",
+					         bits, run_length, pixels_read, dbuf_len, ((pixels_read + run_length) < dbuf_len) ? "TRUE" : "FALSE");
 					while (run_length-- > 0 && pixels_read < dbuf_len) {
 						*destbuf++ = bits;
 						pixels_read++;
@@ -671,6 +672,8 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 						else {
 							if (map_table)
 								bits = map_table[bits];
+							g_print ("READ_nBIT_STRING (4): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]\n",
+							         bits, run_length, pixels_read, dbuf_len, ((pixels_read + run_length) < dbuf_len) ? "TRUE" : "FALSE");
 							while (run_length-- > 0 && pixels_read < dbuf_len) {
 								*destbuf++ = bits;
 								pixels_read++;
@@ -686,6 +689,8 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 						else {
 							if (map_table)
 								bits = map_table[bits];
+							g_print ("READ_nBIT_STRING (4): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]\n",
+							         bits, run_length, pixels_read, dbuf_len, ((pixels_read + run_length) < dbuf_len) ? "TRUE" : "FALSE");
 							while (run_length-- > 0 && pixels_read < dbuf_len) {
 								*destbuf++ = bits;
 								pixels_read++;
@@ -698,6 +703,7 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 						else
 							bits = 0;
 						if (pixels_read <= dbuf_len) {
+							g_print ("READ_nBIT_STRING (4): Putting value 0x%x in destbuf 2 times (hardcoded)\n", bits);
 							*destbuf++ = bits;
 							*destbuf++ = bits;
 						}
@@ -710,6 +716,7 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 						bits = map_table[0];
 					else
 						bits = 0;
+					g_print ("READ_nBIT_STRING (4): Putting value 0x%x in destbuf 1 times (hardcoded)\n", bits);
 					*destbuf++ = bits;
 					pixels_read++;
 				}
@@ -762,7 +769,7 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 	                    0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
 	guint8 *map_table;
 
-	g_print ("DVB pixel block size %d, %s field:\n", buf_size,
+	g_print ("READ_PIXEL_DATA_BLOCK: DVB pixel block size %d, %s field:\n", buf_size,
 	         top_bottom ? "bottom" : "top");
 
 #ifdef DEBUG_PACKET_CONTENTS
@@ -816,6 +823,7 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 
 				/* FIXME: I don't see any guards about buffer size here - buf++ happens with the switch, but size
 				 * FIXME: passed is the global size apparently? */
+				g_print ("READ_nBIT_STRING (4): String data into position %dx%d\n", x_pos, y_pos);
 				x_pos += _dvb_sub_read_4bit_string(pbuf + (y_pos * region->width) + x_pos,
 				                                   region->width - x_pos, &buf, buf_size,
 				                                   non_mod, map_table);
@@ -834,23 +842,27 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 				break;
 
 			case 0x20:
+				g_print ("READ_nBIT_PIXEL_DATA_BLOCK: handling map2to4 table data\n");
 				/* FIXME: I don't see any guards about buffer size here - buf++ happens with the switch, but
-				 * FIXME: buffer is walked without length checks? */
+				 * FIXME: buffer is walked without length checks? Same deal in other map table cases */
 				map2to4[0] = (*buf) >> 4;
 				map2to4[1] = (*buf++) & 0xf;
 				map2to4[2] = (*buf) >> 4;
 				map2to4[3] = (*buf++) & 0xf;
 				break;
 			case 0x21:
+				g_print ("READ_nBIT_PIXEL_DATA_BLOCK: handling map2to8 table data\n");
 				for (i = 0; i < 4; i++)
 					map2to8[i] = *buf++;
 				break;
 			case 0x22:
+				g_print ("READ_nBIT_PIXEL_DATA_BLOCK: handling map4to8 table data\n");
 				for (i = 0; i < 16; i++)
 					map4to8[i] = *buf++;
 				break;
 
 			case 0xf0:
+				g_print ("READ_nBIT_PIXEL_DATA_BLOCK: end of object line code encountered\n");
 				x_pos = display->x_pos;
 				y_pos += 2;
 				break;
@@ -875,6 +887,8 @@ _dvb_sub_parse_object_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 	buf += 2;
 
 	object = get_object (dvb_sub, object_id);
+
+	g_print ("READ_nBIT_PRE - parse_object_segment: A new object segment has occurred\n");
 
 	if (!object) {
 		g_warning ("Nothing known about object with ID %u yet inside parse_object_segment, bailing out", object_id);
