@@ -36,6 +36,8 @@
 #include <gst/base/gstbitreader.h> /* GstBitReader */
 #include "ffmpeg-colorspace.h" /* YUV_TO_RGB1_CCIR */
 
+//#define DEBUG_SAVE_IMAGES /* NOTE: This requires netpbm on the system - pnmtopng is called with system() */
+
 /* FIXME: Are we waiting for an acquisition point before trying to do things? */
 /* FIXME: In the end convert some of the guint8/16 (especially stack variables) back to gint for access efficiency */
 
@@ -108,6 +110,34 @@ typedef struct DVBSubRegion
 	DVBSubObjectDisplay *display_list;
 } DVBSubRegion;
 
+/* FIXME: AVCodec representation of graphics data. Can be removed once it is converted away from ffmpeg way */
+/**
+ * four components are given, that's all.
+ * the last component is alpha
+ */
+typedef struct AVPicture {
+	guint8 *data[4];
+	int linesize[4]; /** number of bytes per line */ /* FIXME: Why does this have four elements, we use only first */
+} AVPicture;
+
+typedef struct DVBSubtitleRect {
+	int x; /** x coordinate of top left corner */
+	int y; /** y coordinate of top left corner */
+	int w; /** width */
+	int h; /** height */
+
+	/* FIXME: AVCodec representation of graphics data.
+	 * FIXME: Convert to be suitable for us in Qt and GStreamer. */
+	/** data+linesize for the bitmap of this subtitle.*/
+	AVPicture pict;
+} DVBSubtitleRect;
+
+/* FIXME: Temporary */
+typedef struct AVSubtitle {
+	unsigned num_rects;
+	DVBSubtitleRect **rects;
+} AVSubtitle;
+
 typedef struct _DvbSubPrivate DvbSubPrivate;
 struct _DvbSubPrivate
 {
@@ -130,6 +160,7 @@ typedef enum
 	BOTTOM_FIELD = 1
 } DvbSubPixelDataSubBlockFieldType;
 
+/* FIXME: It might make sense to pass DvbSubPrivate for all the get_* functions, instead of public DvbSub */
 static DVBSubObject *
 get_object (DvbSub *dvb_sub, guint16 object_id)
 {
@@ -581,7 +612,7 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
                           const guint8 **srcbuf, gint buf_size,
                           guint8 non_mod, guint8 *map_table)
 {
-	g_print ("Inside %s\n", __PRETTY_FUNCTION__);
+	g_print ("READ_nBIT_STRING (4): Inside %s with dbuf_len = %d\n", __PRETTY_FUNCTION__, dbuf_len);
 	/* TODO */
 	GstBitReader gb = GST_BIT_READER_INIT (*srcbuf, buf_size);
 	/* FIXME: Handle FALSE returns from gst_bit_reader_get_* calls? */
@@ -590,15 +621,19 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 	guint run_length;
 	int pixels_read = 0;
 
-	while (gst_bit_reader_get_remaining (&gb) < (buf_size << 3) && pixels_read < dbuf_len) {
+	while (gst_bit_reader_get_remaining (&gb) < buf_size << 3 && pixels_read < dbuf_len) {
 		gst_bit_reader_get_bits_uint32 (&gb, &bits, 2);
 
 		if (bits) {
 			if (non_mod != 1 || bits != 1) {
-				if (map_table)
+				if (map_table) {
 					*destbuf++ = map_table[bits];
-				else
+					g_print ("READ_nBIT_STRING (4): Putting value in destbuf: 0x%x", map_table[bits]);
+				}
+				else {
 					*destbuf++ = bits;
+					g_print ("READ_nBIT_STRING (4): Putting value in destbuf: 0x%x\n", map_table[bits]);
+				}
 			}
 			pixels_read++;
 		} else {
@@ -613,6 +648,7 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 				else {
 					if (map_table)
 						bits = map_table[bits];
+					g_print ("READ_nBIT_STRING (4): Putting value 0x%x in destbuf %d times\n", bits, run_length);
 					while (run_length-- > 0 && pixels_read < dbuf_len) {
 						*destbuf++ = bits;
 						pixels_read++;
@@ -882,13 +918,253 @@ _dvb_sub_parse_object_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 	}
 }
 
+#ifdef DEBUG_SAVE_IMAGES
+static void png_save2(const char *filename, guint32 *bitmap, int w, int h)
+{
+	int x, y, v;
+	FILE *f;
+	char fname[40], fname2[40];
+	char command[1024];
+
+	snprintf(fname, sizeof(fname), "%s.ppm", filename);
+
+	f = fopen(fname, "w");
+	if (!f) {
+		perror(fname);
+		exit(1);
+	}
+	fprintf(f, "P6\n"
+	        "%d %d\n"
+	        "%d\n",
+	        w, h, 255);
+	for(y = 0; y < h; y++) {
+		for(x = 0; x < w; x++) {
+			v = bitmap[y * w + x];
+			putc((v >> 16) & 0xff, f);
+			putc((v >> 8) & 0xff, f);
+			putc((v >> 0) & 0xff, f);
+		}
+	}
+	fclose(f);
+
+
+	snprintf(fname2, sizeof(fname2), "%s-a.pgm", filename);
+
+	f = fopen(fname2, "w");
+	if (!f) {
+		perror(fname2);
+		exit(1);
+	}
+	fprintf(f, "P5\n"
+	        "%d %d\n"
+	        "%d\n",
+	        w, h, 255);
+	for(y = 0; y < h; y++) {
+		for(x = 0; x < w; x++) {
+			v = bitmap[y * w + x];
+			putc((v >> 24) & 0xff, f);
+		}
+	}
+	fclose(f);
+
+	snprintf(command, sizeof(command), "pnmtopng -alpha %s %s > %s.png 2> /dev/null", fname2, fname, filename);
+	system(command);
+
+	//snprintf(command, sizeof(command), "rm %s %s", fname, fname2);
+	//system(command);
+}
+
 static void
+save_display_set(DvbSub *dvb_sub)
+{
+	DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
+
+	DVBSubRegion *region;
+	DVBSubRegionDisplay *display;
+	DVBSubCLUT *clut;
+	guint32 *clut_table;
+	int x_pos, y_pos, width, height;
+	int x, y, y_off, x_off;
+	guint32 *pbuf;
+	char filename[32];
+	static int fileno_index = 0;
+
+	x_pos = -1;
+	y_pos = -1;
+	width = 0;
+	height = 0;
+
+	for (display = priv->display_list; display; display = display->next) {
+		region = get_region(dvb_sub, display->region_id);
+
+		if (x_pos == -1) {
+			x_pos = display->x_pos;
+			y_pos = display->y_pos;
+			width = region->width;
+			height = region->height;
+		} else {
+			if (display->x_pos < x_pos) {
+				width += (x_pos - display->x_pos);
+				x_pos = display->x_pos;
+			}
+
+			if (display->y_pos < y_pos) {
+				height += (y_pos - display->y_pos);
+				y_pos = display->y_pos;
+			}
+
+			if (display->x_pos + region->width > x_pos + width) {
+				width = display->x_pos + region->width - x_pos;
+			}
+
+			if (display->y_pos + region->height > y_pos + height) {
+				height = display->y_pos + region->height - y_pos;
+			}
+		}
+	}
+
+	if (x_pos >= 0) {
+
+		pbuf = g_malloc (width * height * 4);
+
+		for (display = priv->display_list; display; display = display->next) {
+			region = get_region(dvb_sub, display->region_id);
+
+			x_off = display->x_pos - x_pos;
+			y_off = display->y_pos - y_pos;
+
+			clut = get_clut(dvb_sub, region->clut);
+
+			if (clut == 0)
+				clut = &default_clut;
+
+			switch (region->depth) {
+				case 2:
+					clut_table = clut->clut4;
+					break;
+				case 8:
+					clut_table = clut->clut256;
+					break;
+				case 4:
+				default:
+					clut_table = clut->clut16;
+					break;
+			}
+
+			for (y = 0; y < region->height; y++) {
+				for (x = 0; x < region->width; x++) {
+					pbuf[((y + y_off) * width) + x_off + x] =
+						clut_table[region->pbuf[y * region->width + x]];
+					//g_print ("pbuf@%dx%d = 0x%x\n", x_off + x, y_off + y, clut_table[region->pbuf[y * region->width + x]]);
+				}
+			}
+
+		}
+
+		snprintf (filename, sizeof(filename), "dvbs.%d", fileno_index);
+
+		png_save2 (filename, pbuf, width, height);
+
+		g_free (pbuf);
+	}
+
+	fileno_index++;
+}
+#endif
+
+static gint
 _dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint buf_size)
 {
-	static int counter = 0;
-	++counter;
-	g_print ("END OF DISPLAY SET %d: page_id = %u, length = %d\n", counter, page_id, buf_size);
-	/* TODO */
+	DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
+
+	/* FIXME: Temporarily declared in here for save_display_set testing */
+	AVSubtitle *sub = g_slice_new0 (AVSubtitle);
+
+	DVBSubRegion *region;
+	DVBSubRegionDisplay *display;
+	DVBSubtitleRect *rect;
+	DVBSubCLUT *clut;
+	guint32 *clut_table;
+	int i;
+
+	g_print ("END OF DISPLAY SET: page_id = %u, length = %d\n", page_id, buf_size);
+
+	sub->rects = NULL;
+#if 0 /* FIXME: PTS stuff not figured out yet */
+	sub->start_display_time = 0;
+	sub->end_display_time = priv->page_time_out * 1000;
+	sub->format = 0; /* 0 = graphics */
+#endif
+
+	sub->num_rects = priv->display_list_size;
+
+	if (sub->num_rects > 0){
+		sub->rects = g_malloc0 (sizeof(*sub->rects) * sub->num_rects); /* GSlice? */
+		for(i=0; i<sub->num_rects; i++)
+			sub->rects[i] = g_malloc0 (sizeof(*sub->rects[i])); /* GSlice? */
+	}
+
+	i = 0;
+
+	for (display = priv->display_list; display; display = display->next) {
+		region = get_region(dvb_sub, display->region_id);
+		rect = sub->rects[i];
+
+		if (!region)
+			continue;
+
+		rect->x = display->x_pos;
+		rect->y = display->y_pos;
+		rect->w = region->width;
+		rect->h = region->height;
+#if 0 /* FIXME: Don't think we need to save the number of colors in the palette when we are saving as RGBA? */
+		rect->nb_colors = 16;
+#endif
+#if 0 /* FIXME: Needed to be specified once we support strings of characters based subtitles */
+		rect->type      = SUBTITLE_BITMAP;
+#endif
+		rect->pict.linesize[0] = region->width;
+
+		clut = get_clut(dvb_sub, region->clut);
+
+		if (!clut)
+			clut = &default_clut;
+
+		switch (region->depth) {
+			case 2:
+				clut_table = clut->clut4;
+				break;
+			case 8:
+				clut_table = clut->clut256;
+				break;
+			case 4:
+			default:
+				clut_table = clut->clut16;
+				break;
+		}
+
+		/* FIXME: Tweak this to be saved in a format most suitable for Qt and GStreamer instead.
+		 * Currently kept in AVPicture for quick save_display_set testing */
+		rect->pict.data[1] = g_malloc((1 << region->depth) * sizeof(guint32)); /* FIXME: Can we use GSlice here? */
+		memcpy(rect->pict.data[1], clut_table, (1 << region->depth) * sizeof(guint32));
+		g_print ("rect->pict.data[1] content:\n");
+		gst_util_dump_mem (rect->pict.data[1], (1 << region->depth) * sizeof(guint32));
+
+		rect->pict.data[0] = g_malloc(region->buf_size); /* FIXME: Can we use GSlice here? */
+		memcpy(rect->pict.data[0], region->pbuf, region->buf_size);
+		g_print ("rect->pict.data[0] content:\n");
+		gst_util_dump_mem (rect->pict.data[0], region->buf_size);
+
+		i++;
+	}
+
+	sub->num_rects = i;
+
+#ifdef DEBUG_SAVE_IMAGES
+	save_display_set(dvb_sub);
+#endif
+
+	return 1; /* FIXME: The caller of this function is probably supposed to do something with the return value */
 }
 
 /**
