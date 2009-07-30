@@ -36,7 +36,7 @@
 #include <gst/base/gstbitreader.h> /* GstBitReader */
 #include "ffmpeg-colorspace.h" /* YUV_TO_RGB1_CCIR */
 
-//#define DEBUG_SAVE_IMAGES /* NOTE: This requires netpbm on the system - pnmtopng is called with system() */
+#define DEBUG_SAVE_IMAGES /* NOTE: This requires netpbm on the system - pnmtopng is called with system() */
 
 /* FIXME: Are we waiting for an acquisition point before trying to do things? */
 /* FIXME: In the end convert some of the guint8/16 (especially stack variables) back to gint for access efficiency */
@@ -621,7 +621,10 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 	guint run_length;
 	int pixels_read = 0;
 
-	while (gst_bit_reader_get_remaining (&gb) < buf_size << 3 && pixels_read < dbuf_len) {
+	/* FIXME-FFMPEG: The code in libavcodec checks for bits remaining to be less than buf_size,
+	 * FIXME-FFMPEG: but in my test sample they are always exactly equal, and the loop is never entered.
+	 * FIXME-FFMPEG: This can't be right, so fixed to a less than or equal check; query ffmpeg folk */
+	while (gst_bit_reader_get_remaining (&gb) <= buf_size << 3 && pixels_read < dbuf_len) {
 		gst_bit_reader_get_bits_uint32 (&gb, &bits, 2);
 
 		if (bits) {
