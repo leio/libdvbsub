@@ -56,7 +56,7 @@ main (int argc, char *argv[])
 		return -1;
 	}
 
-	dvb_sub_feed (sub_parser, file_buf, file_len);
+	dvb_sub_feed (sub_parser, (guchar*)file_buf, file_len);
 
 	return 0;
 }
