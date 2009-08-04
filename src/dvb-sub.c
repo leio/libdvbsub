@@ -50,13 +50,17 @@ enum
 	DVB_LOG_GENERAL,
 	DVB_LOG_PAGE,
 	DVB_LOG_REGION,
+	DVB_LOG_OBJECT,
+	DVB_LOG_PIXEL,
 	DVB_LOG_LAST
 };
 
 const char *dvb_log_type_list[] = {
-	"General", /* DVB_LOG_GENERAL */
-	"Page Composition Segment", /* DVB_LOG_PAGE */
-	"Region", /* DVB_LOG_REGION */
+	"GENERAL", /* DVB_LOG_GENERAL */
+	"PAGE", /* DVB_LOG_PAGE */
+	"REGION", /* DVB_LOG_REGION */
+	"OBJECT", /* DVB_LOG_OBJECT */
+	"PIXEL", /* DVB_LOG_READ_NBIT_STRING */
 };
 
 static void dvb_log (const gint      log_type,
@@ -684,7 +688,8 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
                           const guint8 **srcbuf, gint buf_size,
                           guint8 non_mod, guint8 *map_table)
 {
-	g_print ("READ_nBIT_STRING (4): Inside %s with dbuf_len = %d\n", __PRETTY_FUNCTION__, dbuf_len);
+	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+	         "(n=4): Inside %s with dbuf_len = %d\n", __PRETTY_FUNCTION__, dbuf_len);
 	/* TODO */
 	GstBitReader gb = GST_BIT_READER_INIT (*srcbuf, buf_size);
 	/* FIXME: Handle FALSE returns from gst_bit_reader_get_* calls? */
@@ -703,11 +708,13 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 			if (non_mod != 1 || bits != 1) {
 				if (map_table) {
 					*destbuf++ = map_table[bits];
-					g_print ("READ_nBIT_STRING (4): Putting value in destbuf: 0x%x", map_table[bits]);
+					dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+					         "(n=4): Putting value in destbuf: 0x%x", map_table[bits]);
 				}
 				else {
 					*destbuf++ = bits;
-					g_print ("READ_nBIT_STRING (4): Putting value in destbuf: 0x%x\n", map_table[bits]);
+					dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+					         "(n=4): Putting value in destbuf: 0x%x\n", map_table[bits]);
 				}
 			}
 			pixels_read++;
@@ -723,7 +730,8 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 				else {
 					if (map_table)
 						bits = map_table[bits];
-					g_print ("READ_nBIT_STRING (4): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]\n",
+					dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+					         "(n=4): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]\n",
 					         bits, run_length, pixels_read, dbuf_len, ((pixels_read + run_length) < dbuf_len) ? "TRUE" : "FALSE");
 					while (run_length-- > 0 && pixels_read < dbuf_len) {
 						*destbuf++ = bits;
@@ -744,7 +752,8 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 						else {
 							if (map_table)
 								bits = map_table[bits];
-							g_print ("READ_nBIT_STRING (4): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]\n",
+							dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+							         "(n=4): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]\n",
 							         bits, run_length, pixels_read, dbuf_len, ((pixels_read + run_length) < dbuf_len) ? "TRUE" : "FALSE");
 							while (run_length-- > 0 && pixels_read < dbuf_len) {
 								*destbuf++ = bits;
@@ -761,7 +770,8 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 						else {
 							if (map_table)
 								bits = map_table[bits];
-							g_print ("READ_nBIT_STRING (4): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]\n",
+							dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+							         "(n=4): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]\n",
 							         bits, run_length, pixels_read, dbuf_len, ((pixels_read + run_length) < dbuf_len) ? "TRUE" : "FALSE");
 							while (run_length-- > 0 && pixels_read < dbuf_len) {
 								*destbuf++ = bits;
@@ -775,7 +785,8 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 						else
 							bits = 0;
 						if (pixels_read <= dbuf_len) {
-							g_print ("READ_nBIT_STRING (4): Putting value 0x%x in destbuf 2 times (hardcoded)\n", bits);
+							dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+							         "(n=4): Putting value 0x%x in destbuf 2 times (hardcoded)\n", bits);
 							*destbuf++ = bits;
 							*destbuf++ = bits;
 						}
@@ -788,7 +799,8 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 						bits = map_table[0];
 					else
 						bits = 0;
-					g_print ("READ_nBIT_STRING (4): Putting value 0x%x in destbuf 1 times (hardcoded)\n", bits);
+					dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+					         "(n=4): Putting value 0x%x in destbuf 1 times (hardcoded)\n", bits);
 					*destbuf++ = bits;
 					pixels_read++;
 				}
@@ -808,6 +820,8 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 
 	(*srcbuf) += (gst_bit_reader_get_remaining (&gb) + 7) >> 3;
 
+	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+	         "(n=4): Returning with %d pixels read (caller will advance x_pos by that)\n", pixels_read);
 	return pixels_read;
 }
 
@@ -841,8 +855,9 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 	                    0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff};
 	guint8 *map_table;
 
-	g_print ("READ_PIXEL_DATA_BLOCK: DVB pixel block size %d, %s field:\n", buf_size,
-	         top_bottom ? "bottom" : "top");
+	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+	         "(parse_block): DVB pixel block size %d, %s field:\n",
+	         buf_size, top_bottom ? "bottom" : "top");
 
 #ifdef DEBUG_PACKET_CONTENTS
 	gst_util_dump_mem (buf, buf_size);
@@ -914,7 +929,8 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 				break;
 
 			case 0x20:
-				g_print ("READ_nBIT_PIXEL_DATA_BLOCK: handling map2to4 table data\n");
+				dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+				         "(parse_block): handling map2to4 table data\n");
 				/* FIXME: I don't see any guards about buffer size here - buf++ happens with the switch, but
 				 * FIXME: buffer is walked without length checks? Same deal in other map table cases */
 				map2to4[0] = (*buf) >> 4;
@@ -923,18 +939,21 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 				map2to4[3] = (*buf++) & 0xf;
 				break;
 			case 0x21:
-				g_print ("READ_nBIT_PIXEL_DATA_BLOCK: handling map2to8 table data\n");
+				dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+				         "(parse_block): handling map2to8 table data\n");
 				for (i = 0; i < 4; i++)
 					map2to8[i] = *buf++;
 				break;
 			case 0x22:
-				g_print ("READ_nBIT_PIXEL_DATA_BLOCK: handling map4to8 table data\n");
+				dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+				         "(parse_block): handling map4to8 table data\n");
 				for (i = 0; i < 16; i++)
 					map4to8[i] = *buf++;
 				break;
 
 			case 0xf0:
-				g_print ("READ_nBIT_PIXEL_DATA_BLOCK: end of object line code encountered\n");
+				dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+				         "(parse_block): end of object line code encountered\n");
 				x_pos = display->x_pos;
 				y_pos += 2;
 				break;
@@ -960,7 +979,8 @@ _dvb_sub_parse_object_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 
 	object = get_object (dvb_sub, object_id);
 
-	g_print ("READ_nBIT_PRE - parse_object_segment: A new object segment has occurred\n");
+	dvb_log (DVB_LOG_OBJECT, G_LOG_LEVEL_DEBUG,
+	         "parse_object_segment: A new object segment has occurred\n");
 
 	if (!object) {
 		g_warning ("Nothing known about object with ID %u yet inside parse_object_segment, bailing out", object_id);
@@ -988,6 +1008,8 @@ _dvb_sub_parse_object_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 		for (display = object->display_list; display; display = display->object_list_next) {
 			block = buf;
 
+			dvb_log (DVB_LOG_OBJECT, G_LOG_LEVEL_DEBUG,
+			         "Parsing top and bottom part of object id %d\n", display->object_id);
 			_dvb_sub_parse_pixel_data_block(dvb_sub, display, block, top_field_len, TOP_FIELD,
 			                                non_modifying_color);
 
