@@ -6,7 +6,7 @@ AM_CPPFLAGS = \
 
 AM_CFLAGS =\
 	 -Wall\
-	 -g
+	 $(DEBUGFLAGS)
 
 bin_PROGRAMS = libdvbsub
 

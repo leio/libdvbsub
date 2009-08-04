@@ -48,6 +48,15 @@ if test x$enable_gtk_doc = xauto ; then
 fi
 AM_CONDITIONAL(ENABLE_GTK_DOC, test x$enable_gtk_doc = xyes)
 
+AC_ARG_ENABLE(debug, AS_HELP_STRING([--enable-debug],[Enable debugging information]), ,enable_debug=no)
+dnl Have we asked for debugging?
+if test "$enable_debug" = yes ; then
+    DEBUGFLAGS="-g -DDEBUG"
+else
+    DEBUGFLAGS=""
+fi
+
+AC_SUBST(DEBUGFLAGS)
 
 AC_OUTPUT([
 Makefile
