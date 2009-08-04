@@ -41,8 +41,8 @@
 /* FIXME: Are we waiting for an acquisition point before trying to do things? */
 /* FIXME: In the end convert some of the guint8/16 (especially stack variables) back to gint for access efficiency */
 
-#if 0 /*ndef DEBUG*/
-#define dvb_log (a, b, c)
+#ifndef DEBUG
+#define dvb_log(log_type, log_level, format...)
 #else
 
 enum
@@ -400,6 +400,7 @@ _dvb_sub_parse_page_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint
 	guint8 region_id;
 	guint8 page_state;
 
+#ifdef DEBUG
 	static int counter = 0;
 	static gchar *page_state_str[] = {
 		"Normal case",
@@ -407,6 +408,7 @@ _dvb_sub_parse_page_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint
 		"Mode Change",
 		"RESERVED"
 	};
+#endif
 
 	if (buf_size < 1)
 		return;
@@ -414,10 +416,12 @@ _dvb_sub_parse_page_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint
 	priv->page_time_out = *buf++;
 	page_state = ((*buf++) >> 2) & 3;
 
+#ifdef DEBUG
 	++counter;
 	dvb_log (DVB_LOG_PAGE, G_LOG_LEVEL_DEBUG,
 	         "%d: page_id = %u, length = %d, page_time_out = %u seconds, page_state = %s\n",
 	         counter, page_id, buf_size, priv->page_time_out, page_state_str[page_state]);
+#endif
 
 	if (page_state == 2) { /* Mode change */
 		delete_state (dvb_sub);
