@@ -41,6 +41,69 @@
 /* FIXME: Are we waiting for an acquisition point before trying to do things? */
 /* FIXME: In the end convert some of the guint8/16 (especially stack variables) back to gint for access efficiency */
 
+#if 0 /*ndef DEBUG*/
+#define dvb_log (a, b, c)
+#else
+
+enum
+{
+	DVB_LOG_GENERAL,
+	DVB_LOG_PAGE,
+	DVB_LOG_REGION,
+	DVB_LOG_LAST
+};
+
+const char *dvb_log_type_list[] = {
+	"General", /* DVB_LOG_GENERAL */
+	"Page Composition Segment", /* DVB_LOG_PAGE */
+	"Region", /* DVB_LOG_REGION */
+};
+
+static void dvb_log (const gint      log_type,
+                     GLogLevelFlags  log_level,
+                     const gchar    *format,
+                     ...)
+{
+	static gboolean enabled_log_types[DVB_LOG_LAST] = {0, };
+	static gboolean enabled_log_types_initialized = FALSE;
+
+	if (!enabled_log_types_initialized) {
+		const gchar *env_log_types = g_getenv ("DVB_LOG");
+		int i;
+
+		enabled_log_types_initialized = TRUE;
+
+		/* Figure out what log types are enabled */
+		if (!env_log_types) {
+			/* Enable all log types if none given */
+			for (i = 0; i < DVB_LOG_LAST; ++i)
+				enabled_log_types[i] = TRUE;
+		} else {
+			int j;
+			gchar **split = g_strsplit (env_log_types, ";", 0);
+			i = 0;
+			while (split[i] != NULL) {
+				for (j = 0; j < DVB_LOG_LAST; ++j) {
+					if (g_str_equal (dvb_log_type_list[j], split[i])) {
+						enabled_log_types[i] = TRUE;
+						break; /* Match found */
+					}
+				}
+				++i;
+			}
+		}
+	}
+
+	if (enabled_log_types[log_type]) {
+		gchar *format2 = g_strdup_printf ("%s: %s", dvb_log_type_list[log_type], format);
+		va_list args;
+		va_start (args, format);
+		g_logv ("libdvbsub", log_level, format2, args);
+		va_end (args);
+	}
+}
+#endif
+
 #define MAX_NEG_CROP 1024
 static guint8 ff_cropTbl[256 + 2 * MAX_NEG_CROP] = { 0, };
 
@@ -352,7 +415,8 @@ _dvb_sub_parse_page_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint
 	page_state = ((*buf++) >> 2) & 3;
 
 	++counter;
-	g_print ("PAGE COMPOSITION %d: page_id = %u, length = %d, page_time_out = %u seconds, page_state = %s\n",
+	dvb_log (DVB_LOG_PAGE, G_LOG_LEVEL_DEBUG,
+	         "%d: page_id = %u, length = %d, page_time_out = %u seconds, page_state = %s\n",
 	         counter, page_id, buf_size, priv->page_time_out, page_state_str[page_state]);
 
 	if (page_state == 2) { /* Mode change */
@@ -391,8 +455,9 @@ _dvb_sub_parse_page_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint
 		priv->display_list = display;
 		priv->display_list_size++;
 
-		g_print ("PAGE COMPOSITION %d: REGION information: ID = %u, address = %ux%u\n", counter,
-		          region_id, display->x_pos, display->y_pos);
+		dvb_log (DVB_LOG_PAGE, G_LOG_LEVEL_DEBUG,
+		         "%d: REGION information: ID = %u, address = %ux%u\n",
+		         counter, region_id, display->x_pos, display->y_pos);
 	}
 
 	while (tmp_display_list) {
@@ -467,11 +532,14 @@ _dvb_sub_parse_region_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 			region->bgcolor = (((*buf++) >> 2) & 3);
 	}
 
-	g_print ("REGION DATA: id = %u, (%ux%u)@%u-bit\n", region_id, region->width, region->height, region->depth);
+	dvb_log (DVB_LOG_REGION, G_LOG_LEVEL_DEBUG,
+	         "id = %u, (%ux%u)@%u-bit\n",
+	         region_id, region->width, region->height, region->depth);
 
 	if (fill) {
 		memset (region->pbuf, region->bgcolor, region->buf_size);
-		g_print ("REGION DATA: Filling region (%u) with bgcolor = %u\n", region->id, region->bgcolor);
+		dvb_log (DVB_LOG_REGION, G_LOG_LEVEL_DEBUG,
+		         "Filling region (%u) with bgcolor = %u\n", region->id, region->bgcolor);
 	}
 
 	delete_region_display_list (dvb_sub, region); /* Delete the region display list for current region - FIXME: why? */
