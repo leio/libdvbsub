@@ -423,7 +423,7 @@ _dvb_sub_parse_page_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint
 #ifdef DEBUG
 	++counter;
 	dvb_log (DVB_LOG_PAGE, G_LOG_LEVEL_DEBUG,
-	         "%d: page_id = %u, length = %d, page_time_out = %u seconds, page_state = %s\n",
+	         "%d: page_id = %u, length = %d, page_time_out = %u seconds, page_state = %s",
 	         counter, page_id, buf_size, priv->page_time_out, page_state_str[page_state]);
 #endif
 
@@ -464,7 +464,7 @@ _dvb_sub_parse_page_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint
 		priv->display_list_size++;
 
 		dvb_log (DVB_LOG_PAGE, G_LOG_LEVEL_DEBUG,
-		         "%d: REGION information: ID = %u, address = %ux%u\n",
+		         "%d: REGION information: ID = %u, address = %ux%u",
 		         counter, region_id, display->x_pos, display->y_pos);
 	}
 
@@ -541,13 +541,13 @@ _dvb_sub_parse_region_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 	}
 
 	dvb_log (DVB_LOG_REGION, G_LOG_LEVEL_DEBUG,
-	         "id = %u, (%ux%u)@%u-bit\n",
+	         "id = %u, (%ux%u)@%u-bit",
 	         region_id, region->width, region->height, region->depth);
 
 	if (fill) {
 		memset (region->pbuf, region->bgcolor, region->buf_size);
 		dvb_log (DVB_LOG_REGION, G_LOG_LEVEL_DEBUG,
-		         "Filling region (%u) with bgcolor = %u\n", region->id, region->bgcolor);
+		         "Filling region (%u) with bgcolor = %u", region->id, region->bgcolor);
 	}
 
 	delete_region_display_list (dvb_sub, region); /* Delete the region display list for current region - FIXME: why? */
@@ -689,7 +689,7 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
                           guint8 non_mod, guint8 *map_table)
 {
 	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-	         "(n=4): Inside %s with dbuf_len = %d\n", __PRETTY_FUNCTION__, dbuf_len);
+	         "(n=4): Inside %s with dbuf_len = %d", __PRETTY_FUNCTION__, dbuf_len);
 	/* TODO */
 	GstBitReader gb = GST_BIT_READER_INIT (*srcbuf, buf_size);
 	/* FIXME: Handle FALSE returns from gst_bit_reader_get_* calls? */
@@ -714,7 +714,7 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 				else {
 					*destbuf++ = bits;
 					dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-					         "(n=4): Putting value in destbuf: 0x%x\n", map_table[bits]);
+					         "(n=4): Putting value in destbuf: 0x%x", bits);
 				}
 			}
 			pixels_read++;
@@ -731,7 +731,7 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 					if (map_table)
 						bits = map_table[bits];
 					dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-					         "(n=4): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]\n",
+					         "(n=4): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]",
 					         bits, run_length, pixels_read, dbuf_len, ((pixels_read + run_length) < dbuf_len) ? "TRUE" : "FALSE");
 					while (run_length-- > 0 && pixels_read < dbuf_len) {
 						*destbuf++ = bits;
@@ -753,7 +753,7 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 							if (map_table)
 								bits = map_table[bits];
 							dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-							         "(n=4): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]\n",
+							         "(n=4): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]",
 							         bits, run_length, pixels_read, dbuf_len, ((pixels_read + run_length) < dbuf_len) ? "TRUE" : "FALSE");
 							while (run_length-- > 0 && pixels_read < dbuf_len) {
 								*destbuf++ = bits;
@@ -771,7 +771,7 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 							if (map_table)
 								bits = map_table[bits];
 							dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-							         "(n=4): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]\n",
+							         "(n=4): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]",
 							         bits, run_length, pixels_read, dbuf_len, ((pixels_read + run_length) < dbuf_len) ? "TRUE" : "FALSE");
 							while (run_length-- > 0 && pixels_read < dbuf_len) {
 								*destbuf++ = bits;
@@ -786,7 +786,7 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 							bits = 0;
 						if (pixels_read <= dbuf_len) {
 							dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-							         "(n=4): Putting value 0x%x in destbuf 2 times (hardcoded)\n", bits);
+							         "(n=4): Putting value 0x%x in destbuf 2 times (hardcoded)", bits);
 							*destbuf++ = bits;
 							*destbuf++ = bits;
 						}
@@ -800,7 +800,7 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 					else
 						bits = 0;
 					dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-					         "(n=4): Putting value 0x%x in destbuf 1 times (hardcoded)\n", bits);
+					         "(n=4): Putting value 0x%x in destbuf 1 times (hardcoded)", bits);
 					*destbuf++ = bits;
 					pixels_read++;
 				}
@@ -821,7 +821,7 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 	(*srcbuf) += (gst_bit_reader_get_remaining (&gb) + 7) >> 3;
 
 	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-	         "(n=4): Returning with %d pixels read (caller will advance x_pos by that)\n", pixels_read);
+	         "(n=4): Returning with %d pixels read (caller will advance x_pos by that)", pixels_read);
 	return pixels_read;
 }
 
@@ -856,7 +856,7 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 	guint8 *map_table;
 
 	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-	         "(parse_block): DVB pixel block size %d, %s field:\n",
+	         "(parse_block): DVB pixel block size %d, %s field:",
 	         buf_size, top_bottom ? "bottom" : "top");
 
 #ifdef DEBUG_PACKET_CONTENTS
@@ -930,7 +930,7 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 
 			case 0x20:
 				dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-				         "(parse_block): handling map2to4 table data\n");
+				         "(parse_block): handling map2to4 table data");
 				/* FIXME: I don't see any guards about buffer size here - buf++ happens with the switch, but
 				 * FIXME: buffer is walked without length checks? Same deal in other map table cases */
 				map2to4[0] = (*buf) >> 4;
@@ -940,20 +940,20 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 				break;
 			case 0x21:
 				dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-				         "(parse_block): handling map2to8 table data\n");
+				         "(parse_block): handling map2to8 table data");
 				for (i = 0; i < 4; i++)
 					map2to8[i] = *buf++;
 				break;
 			case 0x22:
 				dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-				         "(parse_block): handling map4to8 table data\n");
+				         "(parse_block): handling map4to8 table data");
 				for (i = 0; i < 16; i++)
 					map4to8[i] = *buf++;
 				break;
 
 			case 0xf0:
 				dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-				         "(parse_block): end of object line code encountered\n");
+				         "(parse_block): end of object line code encountered");
 				x_pos = display->x_pos;
 				y_pos += 2;
 				break;
@@ -980,7 +980,7 @@ _dvb_sub_parse_object_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 	object = get_object (dvb_sub, object_id);
 
 	dvb_log (DVB_LOG_OBJECT, G_LOG_LEVEL_DEBUG,
-	         "parse_object_segment: A new object segment has occurred\n");
+	         "parse_object_segment: A new object segment has occurred");
 
 	if (!object) {
 		g_warning ("Nothing known about object with ID %u yet inside parse_object_segment, bailing out", object_id);
@@ -1009,7 +1009,7 @@ _dvb_sub_parse_object_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 			block = buf;
 
 			dvb_log (DVB_LOG_OBJECT, G_LOG_LEVEL_DEBUG,
-			         "Parsing top and bottom part of object id %d\n", display->object_id);
+			         "Parsing top and bottom part of object id %d", display->object_id);
 			_dvb_sub_parse_pixel_data_block(dvb_sub, display, block, top_field_len, TOP_FIELD,
 			                                non_modifying_color);
 
@@ -1258,13 +1258,17 @@ _dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *buf
 		 * Currently kept in AVPicture for quick save_display_set testing */
 		rect->pict.data[1] = g_malloc((1 << region->depth) * sizeof(guint32)); /* FIXME: Can we use GSlice here? */
 		memcpy(rect->pict.data[1], clut_table, (1 << region->depth) * sizeof(guint32));
+#if 0
 		g_print ("rect->pict.data[1] content:\n");
 		gst_util_dump_mem (rect->pict.data[1], (1 << region->depth) * sizeof(guint32));
+#endif
 
 		rect->pict.data[0] = g_malloc(region->buf_size); /* FIXME: Can we use GSlice here? */
 		memcpy(rect->pict.data[0], region->pbuf, region->buf_size);
+#if 0
 		g_print ("rect->pict.data[0] content:\n");
 		gst_util_dump_mem (rect->pict.data[0], region->buf_size);
+#endif
 
 		i++;
 	}
