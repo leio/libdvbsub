@@ -616,7 +616,7 @@ _dvb_sub_parse_clut_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint
 	int y, cr, cb, alpha;
 	int r, g, b, r_add, g_add, b_add;
 
-#if 1 //def DEBUG_PACKET_CONTENTS
+#ifdef DEBUG_PACKET_CONTENTS
 	g_print("DVB clut packet:\n");
 	gst_util_dump_mem (buf, buf_size);
 #endif
@@ -668,7 +668,8 @@ _dvb_sub_parse_clut_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint
 		YUV_TO_RGB1_CCIR(cb, cr);
 		YUV_TO_RGB2_CCIR(r, g, b, y);
 
-		g_print("CLUT DEFINITION: clut %d := (%d,%d,%d,%d)\n", entry_id, r, g, b, alpha);
+		dvb_log (DVB_LOG_CLUT, G_LOG_LEVEL_DEBUG,
+		         "CLUT DEFINITION: clut %d := (%d,%d,%d,%d)\n", entry_id, r, g, b, alpha);
 
 		if (depth & 0x80)
 			clut->clut4[entry_id] = RGBA(r,g,b,255 - alpha);
@@ -1204,7 +1205,8 @@ _dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *buf
 	guint32 *clut_table;
 	int i;
 
-	g_print ("END OF DISPLAY SET: page_id = %u, length = %d\n", page_id, buf_size);
+	dvb_log (DVB_LOG_DISPLAY, G_LOG_LEVEL_DEBUG,
+	         "END OF DISPLAY SET: page_id = %u, length = %d\n", page_id, buf_size);
 
 	sub->rects = NULL;
 #if 0 /* FIXME: PTS stuff not figured out yet */
