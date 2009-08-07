@@ -50,8 +50,11 @@ enum
 	DVB_LOG_GENERAL,
 	DVB_LOG_PAGE,
 	DVB_LOG_REGION,
+	DVB_LOG_CLUT,
 	DVB_LOG_OBJECT,
 	DVB_LOG_PIXEL,
+	DVB_LOG_RUNLEN,
+	DVB_LOG_DISPLAY,
 	DVB_LOG_LAST
 };
 
@@ -59,8 +62,11 @@ const char *dvb_log_type_list[] = {
 	"GENERAL", /* DVB_LOG_GENERAL */
 	"PAGE", /* DVB_LOG_PAGE */
 	"REGION", /* DVB_LOG_REGION */
+	"CLUT", /* DVB_LOG_CLUT */
 	"OBJECT", /* DVB_LOG_OBJECT */
-	"PIXEL", /* DVB_LOG_READ_NBIT_STRING */
+	"PIXEL", /* DVB_LOG_PIXEL */
+	"RUNLEN", /* DVB_LOG_RUNLEN */
+	"DISPLAY", /* DVB_LOG_DISPLAY */
 };
 
 static void dvb_log (const gint      log_type,
