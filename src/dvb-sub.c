@@ -705,12 +705,12 @@ _dvb_sub_read_2bit_string(guint8 *destbuf, gint dbuf_len,
 			if (non_mod != 1 || bits != 1) {
 				if (map_table) {
 					*destbuf++ = map_table[bits];
-					dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+					dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
 					         "(n=2): Putting pixel code 0x%x in destbuf per mapping table, original bit value is 0x%x", map_table[bits], bits);
 				}
 				else {
 					*destbuf++ = bits;
-					dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+					dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
 					         "(n=2): Putting pixel code 0x%x in destbuf", bits);
 				}
 			} else {
@@ -832,7 +832,7 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
                           const guint8 **srcbuf, gint buf_size,
                           guint8 non_mod, guint8 *map_table)
 {
-	dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
 	         "(n=4): Inside %s with dbuf_len = %d; scribbling on %p", __PRETTY_FUNCTION__, dbuf_len, destbuf);
 
 	GstBitReader gb = GST_BIT_READER_INIT (*srcbuf, buf_size);
@@ -878,7 +878,7 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 
 				if (run_length == 0) {
 					/* TODO: What does this case entail exactly? Skipping of remaining data correct? */
-					dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+					dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
 					         "end_of_string_signal");
 					(*srcbuf) += (gst_bit_reader_get_remaining (&gb) + 7) >> 3;
 					return pixels_read;
