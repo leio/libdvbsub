@@ -832,9 +832,139 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
                           const guint8 **srcbuf, gint buf_size,
                           guint8 non_mod, guint8 *map_table)
 {
-	g_warning ("Inside %s", __PRETTY_FUNCTION__);
-	/* TODO */
-	return dbuf_len;
+	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+	         "(n=4): Inside %s with dbuf_len = %d", __PRETTY_FUNCTION__, dbuf_len);
+
+	GstBitReader gb = GST_BIT_READER_INIT (*srcbuf, buf_size);
+	/* FIXME: Handle FALSE returns from gst_bit_reader_get_* calls? */
+
+	guint32 bits;
+	guint run_length;
+	int pixels_read = 0;
+
+	/* FIXME-FFMPEG: The code in libavcodec checks for bits remaining to be less than buf_size,
+	 * FIXME-FFMPEG: but in my test sample they are always exactly equal, and the loop is never entered.
+	 * FIXME-FFMPEG: This can't be right, so fixed to a less than or equal check; query ffmpeg folk */
+	while (gst_bit_reader_get_remaining (&gb) <= buf_size << 3 && pixels_read < dbuf_len) {
+		gst_bit_reader_get_bits_uint32 (&gb, &bits, 4);
+
+		if (bits) {
+			if (non_mod != 1 || bits != 1) {
+				if (map_table)
+					*destbuf++ = map_table[bits];
+				else
+					*destbuf++ = bits;
+			}
+			pixels_read++;
+		} else {
+			gst_bit_reader_get_bits_uint32 (&gb, &bits, 1);
+			if (bits == 0) {
+				gst_bit_reader_get_bits_uint32 (&gb, &run_length, 3);
+
+				if (run_length == 0) {
+					/* TODO: What does this case entail exactly? Skipping of remaining data correct? */
+					(*srcbuf) += (gst_bit_reader_get_remaining (&gb) + 7) >> 3;
+					return pixels_read;
+				}
+
+				run_length += 2;
+
+				if (map_table)
+					bits = map_table[0];
+				else
+					bits = 0;
+
+				while (run_length-- > 0 && pixels_read < dbuf_len) {
+					*destbuf++ = bits;
+					pixels_read++;
+				}
+			} else {
+				gst_bit_reader_get_bits_uint32 (&gb, &bits, 1);
+				if (bits == 0) {
+					gst_bit_reader_get_bits_uint32 (&gb, &run_length, 2);
+					run_length += 4;
+					gst_bit_reader_get_bits_uint32 (&gb, &bits, 4);
+
+					if (non_mod == 1 && bits == 1)
+						pixels_read += run_length;
+					else {
+						if (map_table)
+							bits = map_table[bits];
+						while (run_length-- > 0 && pixels_read < dbuf_len) {
+							*destbuf++ = bits;
+							pixels_read++;
+						}
+					}
+				} else {
+					gst_bit_reader_get_bits_uint32 (&gb, &bits, 2);
+					if (bits == 2) {
+						gst_bit_reader_get_bits_uint32 (&gb, &run_length, 4);
+						run_length += 9;
+						gst_bit_reader_get_bits_uint32 (&gb, &bits, 4);
+
+						if (non_mod == 1 && bits == 1)
+							pixels_read += run_length;
+						else {
+							if (map_table)
+								bits = map_table[bits];
+							while (run_length-- > 0 && pixels_read < dbuf_len) {
+								*destbuf++ = bits;
+								pixels_read++;
+							}
+						}
+					} else if (bits == 3) {
+						gst_bit_reader_get_bits_uint32 (&gb, &run_length, 8);
+						run_length += 25;
+						gst_bit_reader_get_bits_uint32 (&gb, &bits, 4);
+
+						if (non_mod == 1 && bits == 1)
+							pixels_read += run_length;
+						else {
+							if (map_table)
+								bits = map_table[bits];
+							while (run_length-- > 0 && pixels_read < dbuf_len) {
+								*destbuf++ = bits;
+								pixels_read++;
+							}
+						}
+					} else if (bits == 1) {
+						pixels_read += 2;
+						if (map_table)
+							bits = map_table[0];
+						else
+							bits = 0;
+						if (pixels_read <= dbuf_len) {
+							*destbuf++ = bits;
+							*destbuf++ = bits;
+						}
+					} else {
+						if (map_table)
+							bits = map_table[0];
+						else
+							bits = 0;
+						*destbuf++ = bits;
+						pixels_read ++;
+					}
+				}
+			}
+		}
+	}
+
+#if 1
+	/* FIXME: What is this for? */
+	gst_bit_reader_get_bits_uint32 (&gb, &bits, 8);
+	if (bits) /* FIXME: Is this check meant as a check if the read succeeded? In that case we have GstBitReader return value */
+		g_warning ("DVBSub error: line overflow");
+#else /* Original code from libavcodec for reference until the need is known: */
+	if (get_bits(&gb, 8))
+		av_log(0, AV_LOG_ERROR, "DVBSub error: line overflow\n");
+#endif
+
+	(*srcbuf) += (gst_bit_reader_get_remaining (&gb) + 7) >> 3;
+
+	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+	         "(n=4): Returning with %d pixels read (caller will advance x_pos by that)", pixels_read);
+	return pixels_read;
 }
 
 static int
