@@ -89,7 +89,7 @@ static void dvb_log (const gint      log_type,
 			while (split[i] != NULL) {
 				for (j = 0; j < DVB_LOG_LAST; ++j) {
 					if (g_str_equal (dvb_log_type_list[j], split[i])) {
-						enabled_log_types[i] = TRUE;
+						enabled_log_types[j] = TRUE;
 						break; /* Match found */
 					}
 				}
