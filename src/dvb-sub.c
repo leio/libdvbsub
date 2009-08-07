@@ -685,18 +685,8 @@ _dvb_sub_read_2bit_string(guint8 *destbuf, gint dbuf_len,
                           const guint8 **srcbuf, gint buf_size,
                           guint8 non_mod, guint8 *map_table)
 {
-	g_warning ("Inside %s", __PRETTY_FUNCTION__);
-	/* TODO */
-	return dbuf_len;
-}
-
-static int
-_dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
-                          const guint8 **srcbuf, gint buf_size,
-                          guint8 non_mod, guint8 *map_table)
-{
 	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-	         "(n=4): Inside %s with dbuf_len = %d", __PRETTY_FUNCTION__, dbuf_len);
+	         "(n=2): Inside %s with dbuf_len = %d", __PRETTY_FUNCTION__, dbuf_len);
 	/* TODO */
 	GstBitReader gb = GST_BIT_READER_INIT (*srcbuf, buf_size);
 	/* FIXME: Handle FALSE returns from gst_bit_reader_get_* calls? */
@@ -716,13 +706,16 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 				if (map_table) {
 					*destbuf++ = map_table[bits];
 					dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-					         "(n=4): Putting value in destbuf: 0x%x", map_table[bits]);
+					         "(n=2): Putting pixel code 0x%x in destbuf per mapping table, original bit value is 0x%x", map_table[bits], bits);
 				}
 				else {
 					*destbuf++ = bits;
 					dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-					         "(n=4): Putting value in destbuf: 0x%x", bits);
+					         "(n=2): Putting pixel code 0x%x in destbuf", bits);
 				}
+			} else {
+				dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+				         "(n=2): Non-modifying color, leaving one pixel hole");
 			}
 			pixels_read++;
 		} else {
@@ -737,8 +730,9 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 				else {
 					if (map_table)
 						bits = map_table[bits];
+
 					dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-					         "(n=4): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]",
+					         "(n=2): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]",
 					         bits, run_length, pixels_read, dbuf_len, ((pixels_read + run_length) < dbuf_len) ? "TRUE" : "FALSE");
 					while (run_length-- > 0 && pixels_read < dbuf_len) {
 						*destbuf++ = bits;
@@ -760,7 +754,7 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 							if (map_table)
 								bits = map_table[bits];
 							dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-							         "(n=4): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]",
+							         "(n=2): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]",
 							         bits, run_length, pixels_read, dbuf_len, ((pixels_read + run_length) < dbuf_len) ? "TRUE" : "FALSE");
 							while (run_length-- > 0 && pixels_read < dbuf_len) {
 								*destbuf++ = bits;
@@ -778,7 +772,7 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 							if (map_table)
 								bits = map_table[bits];
 							dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-							         "(n=4): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]",
+							         "(n=2): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]",
 							         bits, run_length, pixels_read, dbuf_len, ((pixels_read + run_length) < dbuf_len) ? "TRUE" : "FALSE");
 							while (run_length-- > 0 && pixels_read < dbuf_len) {
 								*destbuf++ = bits;
@@ -793,7 +787,7 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 							bits = 0;
 						if (pixels_read <= dbuf_len) {
 							dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-							         "(n=4): Putting value 0x%x in destbuf 2 times (hardcoded)", bits);
+							         "(n=2): Putting value 0x%x in destbuf 2 times (hardcoded)", bits);
 							*destbuf++ = bits;
 							*destbuf++ = bits;
 						}
@@ -807,7 +801,7 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 					else
 						bits = 0;
 					dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-					         "(n=4): Putting value 0x%x in destbuf 1 times (hardcoded)", bits);
+					         "(n=2): Putting value 0x%x in destbuf 1 times (hardcoded)", bits);
 					*destbuf++ = bits;
 					pixels_read++;
 				}
@@ -817,6 +811,7 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 
 #if 1
 	/* FIXME: What is this for? With current ported code it seems to always warn with current test case */
+	/* This might have simply been due to parsing 4bit strings with this 2bit string code */
 	gst_bit_reader_get_bits_uint32 (&gb, &bits, 6);
 	if (bits)
 		g_warning ("DVBSub error: line overflow");
@@ -828,8 +823,18 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 	(*srcbuf) += (gst_bit_reader_get_remaining (&gb) + 7) >> 3;
 
 	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-	         "(n=4): Returning with %d pixels read (caller will advance x_pos by that)", pixels_read);
+	         "(n=2): Returning with %d pixels read (caller will advance x_pos by that)", pixels_read);
 	return pixels_read;
+}
+
+static int
+_dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
+                          const guint8 **srcbuf, gint buf_size,
+                          guint8 non_mod, guint8 *map_table)
+{
+	g_warning ("Inside %s", __PRETTY_FUNCTION__);
+	/* TODO */
+	return dbuf_len;
 }
 
 static int
@@ -917,7 +922,8 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 
 				/* FIXME: I don't see any guards about buffer size here - buf++ happens with the switch, but size
 				 * FIXME: passed is the global size apparently? */
-				g_print ("READ_nBIT_STRING (4): String data into position %dx%d\n", x_pos, y_pos);
+				dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+				         "READ_nBIT_STRING (4): String data into position %dx%d\n", x_pos, y_pos);
 				x_pos += _dvb_sub_read_4bit_string(pbuf + (y_pos * region->width) + x_pos,
 				                                   region->width - x_pos, &buf, buf_size,
 				                                   non_mod, map_table);
