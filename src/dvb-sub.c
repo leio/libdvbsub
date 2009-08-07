@@ -889,6 +889,9 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 		y_pos++;
 
 	while (buf < buf_end) {
+		dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+		         "Iteration start, %u bytes missing from end; buf = %p, buf_end = %p",
+		         buf_end - buf, buf, buf_end);
 		if (x_pos > region->width || y_pos > region->height) {
 			g_warning ("Invalid object location!\n"); /* FIXME: Be more verbose */
 			return;
@@ -1022,7 +1025,8 @@ _dvb_sub_parse_object_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 			block = buf;
 
 			dvb_log (DVB_LOG_OBJECT, G_LOG_LEVEL_DEBUG,
-			         "Parsing top and bottom part of object id %d", display->object_id);
+			         "Parsing top and bottom part of object id %d; top_field_len = %u, bottom_field_len = %u",
+			         display->object_id, top_field_len, bottom_field_len);
 			_dvb_sub_parse_pixel_data_block(dvb_sub, display, block, top_field_len, TOP_FIELD,
 			                                non_modifying_color);
 
