@@ -832,8 +832,8 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
                           const guint8 **srcbuf, gint buf_size,
                           guint8 non_mod, guint8 *map_table)
 {
-	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-	         "(n=4): Inside %s with dbuf_len = %d", __PRETTY_FUNCTION__, dbuf_len);
+	dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+	         "(n=4): Inside %s with dbuf_len = %d; scribbling on %p", __PRETTY_FUNCTION__, dbuf_len, destbuf);
 
 	GstBitReader gb = GST_BIT_READER_INIT (*srcbuf, buf_size);
 	/* FIXME: Handle FALSE returns from gst_bit_reader_get_* calls? */
@@ -849,26 +849,45 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 		gst_bit_reader_get_bits_uint32 (&gb, &bits, 4);
 
 		if (bits) {
+			dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+			         "4-bit_pixel-code");
 			if (non_mod != 1 || bits != 1) {
-				if (map_table)
+				if (map_table) {
+					dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+					         "(n=4): Putting pixel code 0x%x in destbuf per mapping table, original bit value is 0x%x",
+					         map_table[bits], bits);
 					*destbuf++ = map_table[bits];
-				else
+				} else {
+					dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+					         "(n=4): Putting pixel code 0x%x in destbuf (no mapping table)", bits);
 					*destbuf++ = bits;
+				}
+			} else {
+				dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+				         "(n=4): Non-modifying color, leaving one pixel hole");
 			}
 			pixels_read++;
 		} else {
+			dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+			         "4-bit_zero");
 			gst_bit_reader_get_bits_uint32 (&gb, &bits, 1);
 			if (bits == 0) {
+				dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+				         "switch_1 == '0'");
 				gst_bit_reader_get_bits_uint32 (&gb, &run_length, 3);
 
 				if (run_length == 0) {
 					/* TODO: What does this case entail exactly? Skipping of remaining data correct? */
+					dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+					         "end_of_string_signal");
 					(*srcbuf) += (gst_bit_reader_get_remaining (&gb) + 7) >> 3;
 					return pixels_read;
 				}
 
 				run_length += 2;
 
+				dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+				         "run_length_3-9 => Setting %u pixels to pseudo-color 0", run_length);
 				if (map_table)
 					bits = map_table[0];
 				else
@@ -879,12 +898,18 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 					pixels_read++;
 				}
 			} else {
+				dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+				         "switch_1 == '1'");
 				gst_bit_reader_get_bits_uint32 (&gb, &bits, 1);
 				if (bits == 0) {
+					dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+					         "switch_2 == '0'");
 					gst_bit_reader_get_bits_uint32 (&gb, &run_length, 2);
 					run_length += 4;
 					gst_bit_reader_get_bits_uint32 (&gb, &bits, 4);
 
+					dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+					         "run_length == %u; bits == 0x%x", run_length, bits);
 					if (non_mod == 1 && bits == 1)
 						pixels_read += run_length;
 					else {
@@ -896,11 +921,18 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 						}
 					}
 				} else {
+					dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+					         "switch_2 == '1'");
 					gst_bit_reader_get_bits_uint32 (&gb, &bits, 2);
 					if (bits == 2) {
+						dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+						         "switch_3 == '10'");
 						gst_bit_reader_get_bits_uint32 (&gb, &run_length, 4);
 						run_length += 9;
 						gst_bit_reader_get_bits_uint32 (&gb, &bits, 4);
+
+						dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+						         "run_length == %u; bits == 0x%x", run_length, bits);
 
 						if (non_mod == 1 && bits == 1)
 							pixels_read += run_length;
@@ -913,9 +945,14 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 							}
 						}
 					} else if (bits == 3) {
+						dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+						         "switch_3 == '11'");
 						gst_bit_reader_get_bits_uint32 (&gb, &run_length, 8);
 						run_length += 25;
 						gst_bit_reader_get_bits_uint32 (&gb, &bits, 4);
+
+						dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+						         "run_length == %u; bits == 0x%x", run_length, bits);
 
 						if (non_mod == 1 && bits == 1)
 							pixels_read += run_length;
@@ -928,6 +965,8 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 							}
 						}
 					} else if (bits == 1) {
+						dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+						         "switch_3 == '01' => 2 pixels of pseudo-color '0000'");
 						pixels_read += 2;
 						if (map_table)
 							bits = map_table[0];
@@ -938,6 +977,8 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 							*destbuf++ = bits;
 						}
 					} else {
+						dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+						         "switch_3 == '00' (0x%x) => 1 pixel of pseudo-color '0000'", bits);
 						if (map_table)
 							bits = map_table[0];
 						else
@@ -1126,7 +1167,7 @@ _dvb_sub_parse_object_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 	object = get_object (dvb_sub, object_id);
 
 	dvb_log (DVB_LOG_OBJECT, G_LOG_LEVEL_DEBUG,
-	         "parse_object_segment: A new object segment has occurred");
+	         "parse_object_segment: A new object segment has occurred for object_id = %u", object_id);
 
 	if (!object) {
 		g_warning ("Nothing known about object with ID %u yet inside parse_object_segment, bailing out", object_id);
