@@ -18,36 +18,11 @@ PKG_CHECK_MODULES(LIBDVBSUB, [glib-2.0 gobject-2.0 gstreamer-0.10 gstreamer-base
 ##################################################
 # Check for gtk-doc.
 ##################################################
-AC_ARG_WITH(html-dir, [  --with-html-dir=PATH path to installed docs ])
-if test "x$with_html_dir" = "x" ; then
-  HTML_DIR='${datadir}/gtk-doc/html'
-else
-  HTML_DIR=$with_html_dir
-fi
-AC_SUBST(HTML_DIR)
+GTK_DOC_CHECK([1.9])
 
-gtk_doc_min_version=1.0
-AC_MSG_CHECKING([gtk-doc version >= $gtk_doc_min_version])
-if pkg-config --atleast-version=$gtk_doc_min_version gtk-doc; then
-  AC_MSG_RESULT(yes)
-  GTKDOC=true
-else
-  AC_MSG_RESULT(no)
-  GTKDOC=false
-fi
-dnl Let people disable the gtk-doc stuff.
-AC_ARG_ENABLE(gtk-doc,
-              [  --enable-gtk-doc  Use gtk-doc to build documentation [default=auto]],
-	      enable_gtk_doc="$enableval", enable_gtk_doc=auto)
-if test x$enable_gtk_doc = xauto ; then
-  if test x$GTKDOC = xtrue ; then
-    enable_gtk_doc=yes
-  else
-    enable_gtk_doc=no
-  fi
-fi
-AM_CONDITIONAL(ENABLE_GTK_DOC, test x$enable_gtk_doc = xyes)
-
+#######
+# Debug
+#######
 AC_ARG_ENABLE(debug, AS_HELP_STRING([--enable-debug],[Enable debugging information]), ,enable_debug=no)
 dnl Have we asked for debugging?
 if test "$enable_debug" = yes ; then
@@ -61,4 +36,6 @@ AC_SUBST(DEBUGFLAGS)
 AC_OUTPUT([
 Makefile
 src/Makefile
+docs/Makefile
+docs/reference/Makefile
 ])

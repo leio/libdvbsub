@@ -8,12 +8,19 @@ AM_CFLAGS =\
 	 -Wall\
 	 $(DEBUGFLAGS)
 
-bin_PROGRAMS = libdvbsub
+lib_LTLIBRARIES = libdvbsub-1.la
 
-libdvbsub_SOURCES = \
-	main.c     \
+libdvbsub_1_la_SOURCES = \
 	dvb-sub.h     \
 	dvb-sub.c     \
 	ffmpeg-colorspace.h
 
-libdvbsub_LDADD = $(LIBDVBSUB_LIBS)
+libdvbsub_1_la_LIBADD = $(LIBDVBSUB_LIBS)
+
+
+bin_PROGRAMS = dvbsub-test
+
+dvbsub_test_SOURCES = \
+	main.c
+
+dvbsub_test_LDADD = $(LIBDVBSUB_LIBS) libdvbsub-1.la

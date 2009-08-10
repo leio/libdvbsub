@@ -20,6 +20,15 @@ fi
     exit 1
 }
 
+(grep "^GTK_DOC_CHECK" $srcdir/configure.ac >/dev/null) && {
+  (gtkdocize --version) < /dev/null > /dev/null 2>&1 || {
+    echo
+    echo "**Error**: You must have \`gtk-doc' installed."
+    echo "Install the appropriate package for your distribution."
+    DIE=1
+  }
+}
+
 (autoconf --version) < /dev/null > /dev/null 2>&1 || {
   echo
   echo "**Error**: You must have \`autoconf' installed."
@@ -136,6 +145,10 @@ do
       fi
       echo "Running aclocal $aclocalinclude ..."
       aclocal $aclocalinclude
+      if grep "^GTK_DOC_CHECK" configure.ac >/dev/null; then
+	echo "Running gtkdocize --copy --flavour no-tmpl..."
+	gtkdocize --copy --flavour no-tmpl
+      fi
       if grep "^A[CM]_CONFIG_HEADER" configure.ac >/dev/null; then
 	echo "Running autoheader..."
 	autoheader

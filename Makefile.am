@@ -1,5 +1,5 @@
 AUTOMAKE_OPTIONS = foreign
-SUBDIRS = src 
+SUBDIRS = src docs
 
 libdvbsubdocdir = ${prefix}/doc/libdvbsub
 libdvbsubdoc_DATA = \
@@ -12,6 +12,7 @@ libdvbsubdoc_DATA = \
 
 EXTRA_DIST = $(libdvbsubdoc_DATA)
 
+DISTCHECK_CONFIGURE_FLAGS=--enable-gtk-doc
 
 # Remove doc directory on uninstall
 uninstall-local:
