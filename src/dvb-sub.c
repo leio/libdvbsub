@@ -1096,11 +1096,14 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 
 				/* FIXME: I don't see any guards about buffer size here - buf++ happens with the switch, but size
 				 * FIXME: passed is the global size apparently? */
+
 				dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-				         "READ_nBIT_STRING (4): String data into position %dx%d\n", x_pos, y_pos);
+				         "READ_nBIT_STRING (4): String data into position %dx%d; buf before is %p\n", x_pos, y_pos, buf);
 				x_pos += _dvb_sub_read_4bit_string(pbuf + (y_pos * region->width) + x_pos,
 				                                   region->width - x_pos, &buf, buf_size,
 				                                   non_mod, map_table);
+				dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+				         "READ_nBIT_STRING (4) finished: buf pointer now %p", buf);
 				break;
 			case 0x12:
 				if (region->depth < 8) {
