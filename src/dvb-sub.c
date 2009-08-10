@@ -45,6 +45,15 @@
 #define dvb_log(log_type, log_level, format...)
 #else
 
+/**
+ * SECTION:dvb-sub
+ * @short_description: a DVB subtitle parsing class
+ * @stability: Unstable
+ *
+ * The #DvbSub represents an object used for parsing a DVB subpicture,
+ * and signalling the API user for new bitmaps to show on screen.
+ */
+
 enum
 {
 	DVB_LOG_GENERAL,
@@ -184,7 +193,7 @@ typedef struct DVBSubRegion
 } DVBSubRegion;
 
 /* FIXME: AVCodec representation of graphics data. Can be removed once it is converted away from ffmpeg way */
-/**
+/*
  * four components are given, that's all.
  * the last component is alpha
  */
@@ -193,6 +202,9 @@ typedef struct AVPicture {
 	int linesize[4]; /** number of bytes per line */ /* FIXME: Why does this have four elements, we use only first */
 } AVPicture;
 
+/**
+ * DVBSubtitleRect:
+ */
 typedef struct DVBSubtitleRect {
 	int x; /** x coordinate of top left corner */
 	int y; /** y coordinate of top left corner */
@@ -1486,7 +1498,7 @@ _dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *buf
  *
  * Creates a new #DvbSub.
  *
- * Returns: a newly created #DvbSub
+ * Return value: a newly created #DvbSub
  */
 GObject *
 dvb_sub_new (void)
@@ -1506,7 +1518,7 @@ dvb_sub_new (void)
  * The data given must be a full PES packet, which must
  * include a PTS field in the headers.
  *
- * Returns: a negative value on errors; Amount of data consumed on success. TODO
+ * Return value: a negative value on errors; Amount of data consumed on success. TODO
  */
 gint
 dvb_sub_feed (DvbSub *dvb_sub, guint8 *data, gint len)
@@ -1580,9 +1592,9 @@ dvb_sub_feed (DvbSub *dvb_sub, guint8 *data, gint len)
  * packet header has been already parsed, which contains
  * the PTS information).
  *
- * Returns: -1 if data was unhandled (e.g, not a subtitle packet),
- *			-2 if data parsing was unsuccesful (e.g, length was invalid),
- *			0 or positive if data was handled. FIXME: List the positive return values.
+ * Return value: -1 if data was unhandled (e.g, not a subtitle packet),
+ *				 -2 if data parsing was unsuccesful (e.g, length was invalid),
+ *				  0 or positive if data was handled. FIXME: List the positive return values.
  */
 gint
 dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8* data, gint len)

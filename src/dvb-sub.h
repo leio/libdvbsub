@@ -26,6 +26,12 @@ struct _DvbSubClass
 	GObjectClass parent_class;
 };
 
+/**
+ * DvbSub:
+ *
+ * The #DvbSub struct contains only private fields and should not be
+ * directly accessed.
+ */
 struct _DvbSub
 {
 	GObject parent_instance;
