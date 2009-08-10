@@ -695,9 +695,6 @@ _dvb_sub_read_2bit_string(guint8 *destbuf, gint dbuf_len,
 	guint run_length;
 	int pixels_read = 0;
 
-	/* FIXME-FFMPEG: The code in libavcodec checks for bits remaining to be less than buf_size,
-	 * FIXME-FFMPEG: but in my test sample they are always exactly equal, and the loop is never entered.
-	 * FIXME-FFMPEG: This can't be right, so fixed to a less than or equal check; query ffmpeg folk */
 	while (gst_bit_reader_get_remaining (&gb) <= buf_size << 3 && pixels_read < dbuf_len) {
 		gst_bit_reader_get_bits_uint32 (&gb, &bits, 2);
 
@@ -842,10 +839,9 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 	guint run_length;
 	int pixels_read = 0;
 
-	/* FIXME-FFMPEG: The code in libavcodec checks for bits remaining to be less than buf_size,
-	 * FIXME-FFMPEG: but in my test sample they are always exactly equal, and the loop is never entered.
-	 * FIXME-FFMPEG: This can't be right, so fixed to a less than or equal check; query ffmpeg folk */
-	while (gst_bit_reader_get_remaining (&gb) <= buf_size << 3 && pixels_read < dbuf_len) {
+	//gst_util_dump_mem (*srcbuf, buf_size);
+
+	while (gst_bit_reader_get_pos (&gb) < buf_size << 3 && pixels_read < dbuf_len) {
 		gst_bit_reader_get_bits_uint32 (&gb, &bits, 4);
 
 		if (bits) {
@@ -1001,7 +997,11 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 		av_log(0, AV_LOG_ERROR, "DVBSub error: line overflow\n");
 #endif
 
-	(*srcbuf) += (gst_bit_reader_get_remaining (&gb) + 7) >> 3;
+	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+	         "bitreader position is %u; (%u + 7) >> 3 = %u",
+	         gst_bit_reader_get_pos (&gb), gst_bit_reader_get_pos (&gb), (gst_bit_reader_get_pos (&gb) + 7) >> 3);
+
+	(*srcbuf) += (gst_bit_reader_get_pos (&gb) + 7) >> 3;
 
 	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
 	         "(n=4): Returning with %d pixels read (caller will advance x_pos by that)", pixels_read);
