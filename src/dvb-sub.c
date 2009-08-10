@@ -876,7 +876,14 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 					/* TODO: What does this case entail exactly? Skipping of remaining data correct? */
 					dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
 					         "end_of_string_signal");
+					/* FIXME-FFMPEG? ffmpeg had the equal of gst_bit_reader_get_pos here, which seems logical but
+					 * FIXME-FFMPEG? get_remaining works better with current code for some reason. Figure out
+					 * FIXME-FFMPEG? what the problem is with get_pos and any changes for that might need ffmpeg
+					 * FIXME-FFMPEG? backports too. Just consuming all data doesn't leave good results either.
+					 * Worth looking into it more when the existing warnings in test data are fixed, as those might
+					 * muddy the waters here. */
 					(*srcbuf) += (gst_bit_reader_get_remaining (&gb) + 7) >> 3;
+					//(*srcbuf) += buf_size;
 					return pixels_read;
 				}
 
