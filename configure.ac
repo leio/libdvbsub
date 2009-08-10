@@ -16,9 +16,10 @@ PKG_CHECK_MODULES(LIBDVBSUB, [glib-2.0 gobject-2.0 gstreamer-0.10 gstreamer-base
 
 
 ##################################################
-# Check for gtk-doc.
+# Check for gtk-doc and declare library version
 ##################################################
 GTK_DOC_CHECK([1.9])
+AC_SUBST(LIBDVBSUB_VERSION, AC_PACKAGE_VERSION)
 
 #######
 # Debug
@@ -38,4 +39,5 @@ Makefile
 src/Makefile
 docs/Makefile
 docs/reference/Makefile
+docs/reference/version.xml
 ])
