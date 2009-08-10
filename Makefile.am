@@ -12,6 +12,16 @@ libdvbsubdoc_DATA = \
 
 EXTRA_DIST = $(libdvbsubdoc_DATA)
 
+MAINTAINERCLEANFILES = \
+	$(srcdir)/aclocal.m4 \
+	$(srcdir)/config.guess \
+	$(srcdir)/config.h.in \
+	$(srcdir)/config.sub \
+	$(srcdir)/depcomp \
+	$(srcdir)/install-sh \
+	$(srcdir)/ltmain.sh \
+	$(srcdir)/missing
+
 DISTCHECK_CONFIGURE_FLAGS=--enable-gtk-doc
 
 # Remove doc directory on uninstall
