@@ -24,3 +24,5 @@ dvbsub_test_SOURCES = \
 	main.c
 
 dvbsub_test_LDADD = $(LIBDVBSUB_LIBS) libdvbsub-1.la
+
+-include $(top_srcdir)/git.mk

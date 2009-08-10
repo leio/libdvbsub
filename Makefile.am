@@ -31,3 +31,5 @@ ChangeLog:
 	  (echo A git checkout and git-log is required to generate ChangeLog >&2 && \
 	  echo A git checkout and git-log is required to generate this file >> $@); \
 	fi
+
+-include $(top_srcdir)/git.mk
