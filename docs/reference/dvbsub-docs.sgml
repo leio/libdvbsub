@@ -16,6 +16,7 @@
   <chapter>
     <title>DVB subtitle classes</title>
     <xi:include href="xml/dvb-sub.xml"/>
+    <xi:include href="xml/dvb-log.xml"/>
 
   </chapter>
   <chapter id="object-tree">

@@ -35,15 +35,12 @@
 #include <gst/gstutils.h> /* GST_READ_UINT16_BE */
 #include <gst/base/gstbitreader.h> /* GstBitReader */
 #include "ffmpeg-colorspace.h" /* YUV_TO_RGB1_CCIR */
+#include "dvb-log.h"
 
 #define DEBUG_SAVE_IMAGES /* NOTE: This requires netpbm on the system - pnmtopng is called with system() */
 
 /* FIXME: Are we waiting for an acquisition point before trying to do things? */
 /* FIXME: In the end convert some of the guint8/16 (especially stack variables) back to gint for access efficiency */
-
-#ifndef DEBUG
-#define dvb_log(log_type, log_level, format...)
-#else
 
 /**
  * SECTION:dvb-sub
@@ -53,75 +50,6 @@
  * The #DvbSub represents an object used for parsing a DVB subpicture,
  * and signalling the API user for new bitmaps to show on screen.
  */
-
-enum
-{
-	DVB_LOG_GENERAL,
-	DVB_LOG_PAGE,
-	DVB_LOG_REGION,
-	DVB_LOG_CLUT,
-	DVB_LOG_OBJECT,
-	DVB_LOG_PIXEL,
-	DVB_LOG_RUNLEN,
-	DVB_LOG_DISPLAY,
-	DVB_LOG_LAST
-};
-
-const char *dvb_log_type_list[] = {
-	"GENERAL", /* DVB_LOG_GENERAL */
-	"PAGE", /* DVB_LOG_PAGE */
-	"REGION", /* DVB_LOG_REGION */
-	"CLUT", /* DVB_LOG_CLUT */
-	"OBJECT", /* DVB_LOG_OBJECT */
-	"PIXEL", /* DVB_LOG_PIXEL */
-	"RUNLEN", /* DVB_LOG_RUNLEN */
-	"DISPLAY", /* DVB_LOG_DISPLAY */
-};
-
-static void dvb_log (const gint      log_type,
-                     GLogLevelFlags  log_level,
-                     const gchar    *format,
-                     ...)
-{
-	static gboolean enabled_log_types[DVB_LOG_LAST] = {0, };
-	static gboolean enabled_log_types_initialized = FALSE;
-
-	if (!enabled_log_types_initialized) {
-		const gchar *env_log_types = g_getenv ("DVB_LOG");
-		int i;
-
-		enabled_log_types_initialized = TRUE;
-
-		/* Figure out what log types are enabled */
-		if (!env_log_types) {
-			/* Enable all log types if none given */
-			for (i = 0; i < DVB_LOG_LAST; ++i)
-				enabled_log_types[i] = TRUE;
-		} else {
-			int j;
-			gchar **split = g_strsplit (env_log_types, ";", 0);
-			i = 0;
-			while (split[i] != NULL) {
-				for (j = 0; j < DVB_LOG_LAST; ++j) {
-					if (g_str_equal (dvb_log_type_list[j], split[i])) {
-						enabled_log_types[j] = TRUE;
-						break; /* Match found */
-					}
-				}
-				++i;
-			}
-		}
-	}
-
-	if (enabled_log_types[log_type]) {
-		gchar *format2 = g_strdup_printf ("%s: %s", dvb_log_type_list[log_type], format);
-		va_list args;
-		va_start (args, format);
-		g_logv ("libdvbsub", log_level, format2, args);
-		va_end (args);
-	}
-}
-#endif
 
 #define MAX_NEG_CROP 1024
 static guint8 ff_cropTbl[256 + 2 * MAX_NEG_CROP] = { 0, };
