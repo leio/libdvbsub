@@ -204,6 +204,8 @@ typedef struct AVPicture {
 
 /**
  * DVBSubtitleRect:
+ *
+ * A structure representing a subtitle objects dimensions and content.
  */
 typedef struct DVBSubtitleRect {
 	int x; /** x coordinate of top left corner */
