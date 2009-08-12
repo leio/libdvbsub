@@ -105,15 +105,16 @@ typedef struct DVBSubtitles {
 
 /**
  * DvbSubCallbacks:
- * @new_data: Called when new subpicture data is available for display. @dvb_sub
- *    is the #DvbSub instance this callback originates from; @user_data is the
- * same user_data as was passed through dvb_sub_set_callbacks().
+ * @new_data: called when new subpicture data is available for display. @dvb_sub
+ *    is the #DvbSub instance this callback originates from; @subs is the set of
+ *    subtitle objects that should be display for @page_time_out seconds;
+ *    @user_data is the same user_data as was passed through dvb_sub_set_callbacks();
  *
  * A set of callbacks that can be installed on the #DvbSub with
  * dvb_sub_set_callbacks().
  */
 typedef struct {
-	void     (*new_data) (DvbSub *dvb_sub, /* TODO ,*/ gpointer user_data);
+	void     (*new_data) (DvbSub *dvb_sub, DVBSubtitles * subs, guint8 page_time_out, gpointer user_data);
 	/*< private >*/
 	gpointer _dvb_sub_reserved[3];
 } DvbSubCallbacks;

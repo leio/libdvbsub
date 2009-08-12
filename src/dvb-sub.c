@@ -1396,6 +1396,9 @@ _dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *buf
 	save_display_set(dvb_sub);
 #endif
 
+	if (priv->callbacks.new_data)
+		priv->callbacks.new_data (dvb_sub, sub, priv->page_time_out, priv->user_data);
+
 	return 1; /* FIXME: The caller of this function is probably supposed to do something with the return value */
 }
 
