@@ -1586,6 +1586,61 @@ dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8* data, gint len)
 }
 
 /**
+ * dvb_sub_open_pid:
+ * @dvb_sub: a #DvbSub
+ * @pid: the MPEG-TS PID to open
+ *
+ * Opens a PID directly at the LinuxDVB layer. This is an alternative to feeding
+ * data to the parser manually through dvb_sub_feed() or dvb_sub_feed_with_pts().
+ * The caller is expected to call dvb_sub_read_data when the returned file
+ * descriptor has data available for reading. This is typically achieved by
+ * installing a file watch for reading, with e.g g_io_add_watch(), and calling
+ * dvb_sub_read_data() in its callback.
+ * The file descriptor returned must be closed with dvb_sub_close_pid(),
+ * not through standard C file close functions.
+ *
+ * Return value: the file descriptor opened, -1 on error.
+ */
+int
+dvb_sub_open_pid (DvbSub *dvb_sub, guint32 pid)
+{
+	/* FIXME: Implement. Initial code available in demux-input.c, also compare with zvbi dvb integration code perhaps */
+}
+
+/**
+ * dvb_sub_close_pid:
+ * @dvb_sub: a #DvbSub
+ *
+ * Closes the PID related file descriptor previously opened by dvb_sub_open_pid().
+ */
+void
+dvb_sub_close_pid (DvbSub *dvb_sub)
+{
+	/* FIXME: Implement. */
+}
+
+/**
+ * dvb_sub_read_data:
+ * @dvb_sub: a #DvbSub
+ *
+ * Reads any available data from the objects open file descriptor to the MPEG-TS
+ * elementary stream with PID as passed to dvb_sub_open_pid().
+ */
+void
+dvb_sub_read_data (DvbSub *dvb_sub)
+{
+	DvbSubPrivate *priv;
+
+	g_return_if_fail (dvb_sub != NULL);
+	g_return_if_fail (DVB_IS_SUB (dvb_sub));
+
+	priv = (DvbSubPrivate *)dvb_sub->private_data;
+
+	g_return_if_fail (priv->fd >= 0);
+	/* FIXME: Implement. Try to read as much as possible probably? */
+}
+
+/**
  * dvb_sub_set_callbacks:
  * @dvb_sub: a #DvbSub
  * @callbacks: the callbacks to install
