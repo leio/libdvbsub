@@ -1414,7 +1414,7 @@ dvb_sub_new (void)
 {
   DvbSub *dvbsub = g_object_new (DVB_TYPE_SUB, NULL);
 
-  return G_OBJECT (dvbsub);
+  return dvbsub;
 }
 
 /**
