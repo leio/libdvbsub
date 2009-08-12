@@ -156,6 +156,10 @@ typedef struct AVSubtitle {
 typedef struct _DvbSubPrivate DvbSubPrivate;
 struct _DvbSubPrivate
 {
+	int fd;
+	DvbSubCallbacks callbacks;
+	gpointer user_data;
+
 	guint8 page_time_out;
 	GSList *region_list;
 	GSList *clut_list;
@@ -236,6 +240,7 @@ dvb_sub_init (DvbSub *self)
 
 	/* TODO: Add initialization code here */
 	/* FIXME: Do we have a reason to initiate the members to zero, or are we guaranteed that anyway? */
+	priv->fd = -1;
 	priv->region_list = NULL;
 	priv->object_list = NULL;
 	priv->page_time_out = 0; /* FIXME: Maybe 255 instead? */
@@ -1607,4 +1612,27 @@ dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8* data, gint len)
 	}
 
 	return -2;
+}
+
+/**
+ * dvb_sub_set_callbacks:
+ * @dvb_sub: a #DvbSub
+ * @callbacks: the callbacks to install
+ * @user_data: a user_data argument for the callback
+ *
+ * Set callback which will be executed when new subpictures are available.
+ */
+void
+dvb_sub_set_callbacks (DvbSub *dvb_sub, DvbSubCallbacks *callbacks, gpointer user_data)
+{
+	DvbSubPrivate *priv;
+
+	g_return_if_fail (dvb_sub != NULL);
+	g_return_if_fail (DVB_IS_SUB (dvb_sub));
+	g_return_if_fail (callbacks != NULL);
+
+	priv = (DvbSubPrivate *)dvb_sub->private_data;
+
+	priv->callbacks = *callbacks;
+	priv->user_data = user_data;
 }
