@@ -1409,7 +1409,7 @@ _dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *buf
  *
  * Return value: a newly created #DvbSub
  */
-GObject *
+DvbSub *
 dvb_sub_new (void)
 {
   DvbSub *dvbsub = g_object_new (DVB_TYPE_SUB, NULL);

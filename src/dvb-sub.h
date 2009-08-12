@@ -120,7 +120,7 @@ typedef struct {
 } DvbSubCallbacks;
 
 GType    dvb_sub_get_type      (void) G_GNUC_CONST;
-GObject *dvb_sub_new           (void);
+DvbSub  *dvb_sub_new           (void);
 gint     dvb_sub_feed          (DvbSub *dvb_sub, guint8 *data, gint len);
 gint     dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8 *data, gint len);
 int      dvb_sub_open_pid      (DvbSub *dvb_sub, guint32 pid);
