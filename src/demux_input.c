@@ -62,18 +62,16 @@ int main(void)
 	char buf[2*MAX_READ]; // FIXME: Too large, but menat just as a test
 	ssize_t read_len, write_len;
 
-	FD_ZERO(&rfds);
-
 	if (setupDVBSubPid("/dev/dvb/adapter0/demux0", 1027) < 0) {
 		fprintf(stderr, "PID setup failed, bailing out!\n");
 		exit(2);
 	}
 
-	FD_SET(s_demux_file, &rfds);
-
 	int dump_file = creat("subdump", S_IRUSR | S_IWUSR);
 
 	for (;;) {
+		FD_ZERO(&rfds);
+		FD_SET(s_demux_file, &rfds);
 		tv.tv_sec = 5;
 		tv.tv_usec = 0;
 		printf("Waiting in select for 5 seconds\n");
