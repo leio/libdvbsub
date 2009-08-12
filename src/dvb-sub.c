@@ -1588,6 +1588,14 @@ dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8* data, gint len)
 	return -2;
 }
 
+
+/* FIXME: Move these functions and includes elsewhere later for easier integration
+ * FIXME: for gstreamer needs */
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+#include <linux/dvb/dmx.h>
+
 /**
  * dvb_sub_open_pid:
  * @dvb_sub: a #DvbSub
@@ -1605,9 +1613,54 @@ dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8* data, gint len)
  * Return value: the file descriptor opened, -1 on error.
  */
 int
-dvb_sub_open_pid (DvbSub *dvb_sub, guint32 pid)
+dvb_sub_open_pid (DvbSub *dvb_sub, guint16 pid)
 {
-	/* FIXME: Implement. Initial code available in demux-input.c, also compare with zvbi dvb integration code perhaps */
+	DvbSubPrivate *priv;
+	int ret;
+	struct dmx_pes_filter_params pesfilter = {
+		.pid=pid,
+		.input = DMX_IN_DVR,
+		.output = DMX_OUT_TAP,
+		.pes_type = DMX_PES_SUBTITLE,
+		.flags = 0
+	};
+
+	g_return_val_if_fail (dvb_sub != NULL, -1);
+	g_return_val_if_fail (DVB_IS_SUB (dvb_sub), -1);
+	g_return_val_if_fail (pid > 0, -1);
+
+	priv = (DvbSubPrivate *)dvb_sub->private_data;
+
+	if (priv->fd >= 0) /* a file is already open, close it first */
+		dvb_sub_close_pid (dvb_sub);
+
+	priv->fd = open ("/dev/dvb/adapter0/demux0", O_RDWR | O_NONBLOCK); /* FIXME: allow other hardware demuxers and adapters */
+	if (priv->fd < 0) {
+		perror ("open /dev/dvb/adapter0/demux0");
+		return -1;
+	}
+
+	ret = ioctl (priv->fd, DMX_SET_PES_FILTER, &pesfilter);
+		if (ret != 0) {
+		perror ("ioctl DMX_SET_PES_FILTER");
+		goto error;
+	}
+
+	ret = ioctl (priv->fd, DMX_START);
+	if (ret != 0) {
+		perror ("ioctl DMX_START");
+		goto error;
+	} else {
+		printf ("Demuxing started on pid %u\n", pid);
+	}
+
+	return priv->fd;
+	/* FIXME: Compare with zvbi dvb integration code perhaps */
+
+error:
+	close (priv->fd);
+	priv->fd = -1;
+	return -1;
 }
 
 /**
@@ -1619,7 +1672,17 @@ dvb_sub_open_pid (DvbSub *dvb_sub, guint32 pid)
 void
 dvb_sub_close_pid (DvbSub *dvb_sub)
 {
-	/* FIXME: Implement. */
+	DvbSubPrivate *priv;
+
+	g_return_if_fail (dvb_sub != NULL);
+	g_return_if_fail (DVB_IS_SUB (dvb_sub));
+
+	priv = (DvbSubPrivate *)dvb_sub->private_data;
+
+	g_return_if_fail (priv->fd >= 0);
+
+	close (priv->fd);
+	priv->fd = -1;
 }
 
 /**
@@ -1633,6 +1696,9 @@ void
 dvb_sub_read_data (DvbSub *dvb_sub)
 {
 	DvbSubPrivate *priv;
+	GString *data; /* FIXME: Probably don't use GString in the long run? */
+	gchar buf[4096];
+	ssize_t len_read;
 
 	g_return_if_fail (dvb_sub != NULL);
 	g_return_if_fail (DVB_IS_SUB (dvb_sub));
@@ -1640,7 +1706,22 @@ dvb_sub_read_data (DvbSub *dvb_sub)
 	priv = (DvbSubPrivate *)dvb_sub->private_data;
 
 	g_return_if_fail (priv->fd >= 0);
-	/* FIXME: Implement. Try to read as much as possible probably? */
+
+	data = g_string_sized_new (4096);
+
+	while ((len_read = read (priv->fd, buf, 4096))) {
+		if (len_read < 0) {
+			perror ("read");
+			/* FIXME: What should we actually do here? */
+			break;
+		}
+
+		g_string_append_len (data, buf, len_read);
+	}
+
+	g_print ("read_data called by API user, feeding %" G_GSIZE_FORMAT " bytes into DVB subtitle parser\n", data->len);
+	dvb_sub_feed (dvb_sub, (guint8 *)data->str, data->len);
+	g_string_free (data, TRUE);
 }
 
 /**
