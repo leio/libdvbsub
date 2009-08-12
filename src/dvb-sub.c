@@ -37,7 +37,7 @@
 #include "ffmpeg-colorspace.h" /* YUV_TO_RGB1_CCIR */
 #include "dvb-log.h"
 
-#define DEBUG_SAVE_IMAGES /* NOTE: This requires netpbm on the system - pnmtopng is called with system() */
+//#define DEBUG_SAVE_IMAGES /* NOTE: This requires netpbm on the system - pnmtopng is called with system() */
 
 /* FIXME: Are we waiting for an acquisition point before trying to do things? */
 /* FIXME: In the end convert some of the guint8/16 (especially stack variables) back to gint for access efficiency */
@@ -119,39 +119,6 @@ typedef struct DVBSubRegion
 
 	DVBSubObjectDisplay *display_list;
 } DVBSubRegion;
-
-/* FIXME: AVCodec representation of graphics data. Can be removed once it is converted away from ffmpeg way */
-/*
- * four components are given, that's all.
- * the last component is alpha
- */
-typedef struct AVPicture {
-	guint8 *data[4];
-	int linesize[4]; /** number of bytes per line */ /* FIXME: Why does this have four elements, we use only first */
-} AVPicture;
-
-/**
- * DVBSubtitleRect:
- *
- * A structure representing a subtitle objects dimensions and content.
- */
-typedef struct DVBSubtitleRect {
-	int x; /** x coordinate of top left corner */
-	int y; /** y coordinate of top left corner */
-	int w; /** width */
-	int h; /** height */
-
-	/* FIXME: AVCodec representation of graphics data.
-	 * FIXME: Convert to be suitable for us in Qt and GStreamer. */
-	/** data+linesize for the bitmap of this subtitle.*/
-	AVPicture pict;
-} DVBSubtitleRect;
-
-/* FIXME: Temporary */
-typedef struct AVSubtitle {
-	unsigned num_rects;
-	DVBSubtitleRect **rects;
-} AVSubtitle;
 
 typedef struct _DvbSubPrivate DvbSubPrivate;
 struct _DvbSubPrivate
@@ -1333,8 +1300,7 @@ _dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *buf
 {
 	DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
 
-	/* FIXME: Temporarily declared in here for save_display_set testing */
-	AVSubtitle *sub = g_slice_new0 (AVSubtitle);
+	DVBSubtitles *sub = g_slice_new0 (DVBSubtitles); /* FIXME: Free the contents and it itself afterwards...; FIXME: Do we need to zero-init? */
 
 	DVBSubRegion *region;
 	DVBSubRegionDisplay *display;
@@ -1380,7 +1346,7 @@ _dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *buf
 #if 0 /* FIXME: Needed to be specified once we support strings of characters based subtitles */
 		rect->type      = SUBTITLE_BITMAP;
 #endif
-		rect->pict.linesize[0] = region->width;
+		rect->pict.rowstride = region->width;
 
 		clut = get_clut(dvb_sub, region->clut);
 
@@ -1402,18 +1368,23 @@ _dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *buf
 
 		/* FIXME: Tweak this to be saved in a format most suitable for Qt and GStreamer instead.
 		 * Currently kept in AVPicture for quick save_display_set testing */
-		rect->pict.data[1] = g_malloc((1 << region->depth) * sizeof(guint32)); /* FIXME: Can we use GSlice here? */
-		memcpy(rect->pict.data[1], clut_table, (1 << region->depth) * sizeof(guint32));
+		rect->pict.palette = g_malloc((1 << region->depth) * sizeof(guint32)); /* FIXME: Can we use GSlice here? */
+		memcpy(rect->pict.palette, clut_table, (1 << region->depth) * sizeof(guint32));
 #if 0
-		g_print ("rect->pict.data[1] content:\n");
-		gst_util_dump_mem (rect->pict.data[1], (1 << region->depth) * sizeof(guint32));
+		g_print ("rect->pict.data.palette content:\n");
+		gst_util_dump_mem (rect->pict.palette, (1 << region->depth) * sizeof(guint32));
 #endif
 
-		rect->pict.data[0] = g_malloc(region->buf_size); /* FIXME: Can we use GSlice here? */
-		memcpy(rect->pict.data[0], region->pbuf, region->buf_size);
+		rect->pict.data = g_malloc(region->buf_size); /* FIXME: Can we use GSlice here? */
+		memcpy(rect->pict.data, region->pbuf, region->buf_size);
+
+		static unsigned counter = 0;
+		++counter;
+		g_print ("An object rect created: number %u, iteration %u, pos: %d:%d, size: %dx%d\n", counter, i,
+		         rect->x, rect->y, rect->x, rect->y);
 #if 0
-		g_print ("rect->pict.data[0] content:\n");
-		gst_util_dump_mem (rect->pict.data[0], region->buf_size);
+		g_print ("rect->pict.data content:\n");
+		gst_util_dump_mem (rect->pict.data, region->buf_size);
 #endif
 
 		i++;

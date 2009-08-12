@@ -55,6 +55,55 @@ struct _DvbSub
 };
 
 /**
+ * DVBSubtitlePicture:
+ * @data: the data in the form of palette indices, each byte represents one pixel
+ *   as an index into the @palette.
+ * @palette: the palette used for this subtitle rectangle, up to 256 items depending
+ *   on the depth of the subpicture; each palette item is in RGBA form, 8-bits per channel.
+ * @rowstride: the number of bytes between the start of a row and the start of the next row.
+ *
+ * A structure representing the contents of a subtitle rectangle.
+ *
+ * FIXME: Expose the depth of the palette, and perhaps also the height in this struct.
+ */
+typedef struct DVBSubtitlePicture {
+	guint8 *data;
+	guint32 *palette;
+	int rowstride;
+} DVBSubtitlePicture;
+
+/**
+ * DVBSubtitleRect:
+ * @x: x coordinate of top left corner
+ * @y: y coordinate of top left corner
+ * @w: the width of this subpicture rectangle
+ * @h: the height of this subpicture rectangle
+ * @pict: the content of this subpicture rectangle
+ *
+ * A structure representing one subtitle objects position, dimension and content.
+ */
+typedef struct DVBSubtitleRect {
+	int x;
+	int y;
+	int w;
+	int h;
+
+	DVBSubtitlePicture pict;
+} DVBSubtitleRect;
+
+/**
+ * DVBSubtitles:
+ * @num_rects: the number of #DVBSubtitleRect in @rects
+ * @rects: dynamic array of #DVBSubtitleRect
+ *
+ * A structure representing a set of subtitle objects.
+ */
+typedef struct DVBSubtitles {
+	unsigned int num_rects;
+	DVBSubtitleRect **rects;
+} DVBSubtitles;
+
+/**
  * DvbSubCallbacks:
  * @new_data: Called when new subpicture data is available for display. @dvb_sub
  *    is the #DvbSub instance this callback originates from; @user_data is the
