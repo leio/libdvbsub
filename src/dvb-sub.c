@@ -1350,6 +1350,7 @@ _dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *buf
 		rect->type      = SUBTITLE_BITMAP;
 #endif
 		rect->pict.rowstride = region->width;
+		rect->pict.palette_bits_count = region->depth;
 
 		clut = get_clut(dvb_sub, region->clut);
 
