@@ -55,6 +55,9 @@
 static guint8 ff_cropTbl[256 + 2 * MAX_NEG_CROP] = { 0, };
 
 #define cm (ff_cropTbl + MAX_NEG_CROP)
+
+/* FIXME: This is really ARGB... We might need this configurable for performant
+ * FIXME: use in GStreamer as well if that likes RGBA more (Qt prefers ARGB) */
 #define RGBA(r,g,b,a) (((a) << 24) | ((r) << 16) | ((g) << 8) | (b))
 
 typedef struct DVBSubCLUT {

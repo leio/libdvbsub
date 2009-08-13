@@ -59,7 +59,7 @@ struct _DvbSub
  * @data: the data in the form of palette indices, each byte represents one pixel
  *   as an index into the @palette.
  * @palette: the palette used for this subtitle rectangle, up to 256 items depending
- *   on the depth of the subpicture; each palette item is in RGBA form, 8-bits per channel.
+ *   on the depth of the subpicture; each palette item is in ARGB form, 8-bits per channel.
  * @rowstride: the number of bytes between the start of a row and the start of the next row.
  *
  * A structure representing the contents of a subtitle rectangle.
