@@ -40,4 +40,5 @@ src/Makefile
 docs/Makefile
 docs/reference/Makefile
 docs/reference/version.xml
+libdvbsub-1.pc
 ])

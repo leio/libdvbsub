@@ -10,6 +10,11 @@ libdvbsubdoc_DATA = \
 	NEWS
 
 
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = libdvbsub-1.pc
+
+$(pkgconfig_DATA): config.status
+
 EXTRA_DIST = $(libdvbsubdoc_DATA)
 
 MAINTAINERCLEANFILES = \

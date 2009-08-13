@@ -1,0 +1,12 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: libdvbsub
+Description: DVB subtitles parsing and preparation for display
+Requires: gobject-2.0 glib-2.0
+Requires.private: gstreamer-0.10 gstreamer-base-0.10 >= 0.10.22
+Version: @VERSION@
+Libs: -L${libdir} -ldvbsub-1
+Cflags: -I${includedir}
