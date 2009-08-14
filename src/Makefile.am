@@ -11,7 +11,9 @@ AM_CFLAGS =\
 lib_LTLIBRARIES = libdvbsub-1.la
 
 libdvbsub_1_la_SOURCES = \
-	dvb-sub.c     \
+	dvb-sub.c \
+	dvb-log.c \
+	dvb-log.h \
 	ffmpeg-colorspace.h
 
 pkginclude_HEADERS = \

@@ -32,7 +32,7 @@
  * tracking its data and parsing flow.
  */
 
-
+#ifdef DEBUG
 const char *dvb_log_type_list[] = {
 	"GENERAL", /* DVB_LOG_GENERAL */
 	"PAGE", /* DVB_LOG_PAGE */
@@ -96,3 +96,4 @@ void dvb_log (const gint      log_type,
 		va_end (args);
 	}
 }
+#endif /* DEBUG */
