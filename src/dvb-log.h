@@ -22,6 +22,8 @@
 #ifndef _DVB_SUB_LOG_H_
 #define _DVB_SUB_LOG_H_
 
+#include <glib.h>
+
 G_BEGIN_DECLS
 
 /**
