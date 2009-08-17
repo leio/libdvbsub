@@ -586,7 +586,7 @@ _dvb_sub_parse_clut_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint
 		YUV_TO_RGB2_CCIR(r, g, b, y);
 
 		dvb_log (DVB_LOG_CLUT, G_LOG_LEVEL_DEBUG,
-		         "CLUT DEFINITION: clut %d := (%d,%d,%d,%d)\n", entry_id, r, g, b, alpha);
+		         "CLUT DEFINITION: clut %d := (%d,%d,%d,%d)", entry_id, r, g, b, alpha);
 
 		if (depth & 0x80)
 			clut->clut4[entry_id] = RGBA(r,g,b,255 - alpha);
