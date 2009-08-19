@@ -741,6 +741,7 @@ _dvb_sub_read_2bit_string(guint8 *destbuf, gint dbuf_len,
 	return pixels_read;
 }
 
+#if 0
 static int
 _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
                           const guint8 **srcbuf, gint buf_size,
@@ -931,6 +932,100 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 	         "(n=4): Returning with %d pixels read (caller will advance x_pos by that)", pixels_read);
 	return pixels_read;
 }
+
+#else
+
+static int
+_dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
+                          const guint8 **srcbuf, gint buf_size,
+                          guint8 non_mod, guint8 *map_table)
+{
+	GstBitReader gb = GST_BIT_READER_INIT (*srcbuf, buf_size);
+	/* FIXME: Handle FALSE returns from gst_bit_reader_get_* calls? */
+	gboolean stop_parsing = FALSE;
+	guint32 bits;
+	guint32 pixels_read = 0;
+
+	while (!stop_parsing && (gst_bit_reader_get_remaining (&gb) > 0)) {
+		guint run_length = 0, clut_index = 0;
+		gst_bit_reader_get_bits_uint32 (&gb, &bits, 4);
+
+		if (bits) {
+			run_length = 1;
+			clut_index = bits;
+		} else {
+			gst_bit_reader_get_bits_uint32 (&gb, &bits, 1);
+			if (bits == 0) { /* switch_1 == '0' */
+				gst_bit_reader_get_bits_uint32 (&gb, &run_length, 3);
+				if (!run_length) {
+					stop_parsing = TRUE;
+				} else {
+					run_length += 2;
+				}
+			} else { /* switch_1 == '1' */
+				gst_bit_reader_get_bits_uint32 (&gb, &bits, 1);
+				if (bits == 0) { /* switch_2 == '0' */
+					gst_bit_reader_get_bits_uint32 (&gb, &run_length, 2);
+					run_length += 4;
+					gst_bit_reader_get_bits_uint32 (&gb, &clut_index, 4);
+				} else { /* switch_2 == '1' */
+					gst_bit_reader_get_bits_uint32 (&gb, &bits, 2);
+					switch (bits) {
+						case 0x0: /* switch_3 == '00' */
+							run_length = 1; /* 1 pixel of pseudo-color 0 */
+							break;
+						case 0x1: /* switch_3 == '01' */
+							run_length = 2; /* 2 pixels of pseudo-color 0 */
+							break;
+						case 0x2: /* switch_3 == '10' */
+							gst_bit_reader_get_bits_uint32 (&gb, &run_length, 4);
+							run_length += 9;
+							gst_bit_reader_get_bits_uint32 (&gb, &clut_index, 4);
+							break;
+						case 0x3: /* switch_3 == '11' */
+							gst_bit_reader_get_bits_uint32 (&gb, &run_length, 8);
+							run_length += 25;
+							gst_bit_reader_get_bits_uint32 (&gb, &clut_index, 4);
+							break;
+					}
+				}
+			}
+		}
+
+		/* If run_length is zero, continue. Only case happening is when
+		 * stop_parsing is TRUE too, so next cycle shouldn't run */
+		if (run_length == 0)
+			continue;
+
+		/* Trim the run_length to not go beyond the line end and consume
+		 * it from remaining length of dest line */
+		run_length = MIN (run_length, dbuf_len);
+		dbuf_len -= run_length;
+
+		/* Make clut_index refer to the index into the desired bit depths
+		 * CLUT definition table */
+		if (map_table)
+			clut_index = map_table[clut_index]; /* now clut_index signifies the index into map_table dest */
+
+		/* Now we can simply memset run_length count of destination bytes
+		 * to clut_index, but only if not non_modifying */
+		if (!(non_mod == 1 && bits == 1))
+			memset (destbuf, clut_index, run_length);
+
+		destbuf += run_length;
+		pixels_read += run_length;
+	}
+
+	gst_bit_reader_skip_to_byte (&gb);
+	*srcbuf += gst_bit_reader_get_pos (&gb) >> 3;
+
+	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+	         "Returning from 4bit_string parser with %u pixels read",
+	         pixels_read);
+	// FIXME: Shouldn't need this variable if tracking things in the loop better
+	return pixels_read;
+}
+#endif
 
 static int
 _dvb_sub_read_8bit_string(guint8 *destbuf, gint dbuf_len,
