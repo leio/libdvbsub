@@ -1489,7 +1489,7 @@ _dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *buf
 		static unsigned counter = 0;
 		++counter;
 		g_print ("An object rect created: number %u, iteration %u, pos: %d:%d, size: %dx%d\n", counter, i,
-		         rect->x, rect->y, rect->x, rect->y);
+		         rect->x, rect->y, rect->w, rect->h);
 #if 0
 		g_print ("rect->pict.data content:\n");
 		gst_util_dump_mem (rect->pict.data, region->buf_size);
