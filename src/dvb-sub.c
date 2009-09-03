@@ -928,8 +928,10 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 
 	(*srcbuf) += (gst_bit_reader_get_pos (&gb) + 7) >> 3;
 
+	bits = 0xbc;
+	gst_bit_reader_peek_bits_uint32 (&gb, &bits, 8);
 	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-	         "(n=4): Returning with %d pixels read (caller will advance x_pos by that)", pixels_read);
+	         "(n=4): Returning with %d pixels read (caller will advance x_pos by that), next byte is 0x%x%s", pixels_read, bits, (bits == 0xbc) ? " (MARKER)" : "");
 	return pixels_read;
 }
 
