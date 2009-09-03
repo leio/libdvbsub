@@ -1060,6 +1060,7 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 	guint8 *pbuf;
 	int x_pos, y_pos;
 	int i;
+	gboolean dest_buf_filled = FALSE;
 
 	guint8 map2to4[] = { 0x0,  0x7,  0x8,  0xf};
 	guint8 map2to8[] = {0x00, 0x77, 0x88, 0xff};
@@ -1095,13 +1096,23 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 		         buf_end - buf, buf, buf_end,
 		         region->id, region->width, region->height, x_pos, y_pos);
 		// FFMPEG-FIXME: ffmpeg doesn't check for equality and so can overflow destination buffer later on with bad input data
-		if (x_pos >= region->width || y_pos >= region->height) {
-			g_warning ("Invalid object location for data_type 0x%x!\n", *buf); /* FIXME: Be more verbose */
-			return;
+		// FFMPEG-FIXME: However that makes it warn on end_of_object_line and map tables as well, so we add the dest_buf_filled tracking
+		// FIXME: Removed x_pos checking here, because we don't want to turn dest_buf_filled to TRUE permanently in that case
+		// FIXME: We assume that region->width - x_pos as dbuf_len to read_nbit_string will take care of that case nicely;
+		// FIXME: That is, that read_nbit_string never scribbles anything if dbuf_len passed to it is zero due to this.
+		if (y_pos >= region->height) {
+			dest_buf_filled = TRUE;
 		}
 
 		switch (*buf++) {
 			case 0x10:
+				if (dest_buf_filled) {
+					g_warning ("Invalid object location for data_type 0x%x!\n", *(buf-1)); /* FIXME: Be more verbose */
+					g_print ("Remaining data after invalid object location:\n");
+					gst_util_dump_mem (buf, buf_end - buf);
+					return;
+				}
+
 				if (region->depth == 8)
 					map_table = map2to8;
 				else if (region->depth == 4)
@@ -1116,6 +1127,13 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 				                                   non_mod, map_table);
 				break;
 			case 0x11:
+				if (dest_buf_filled) {
+					g_warning ("Invalid object location for data_type 0x%x!\n", *(buf-1)); /* FIXME: Be more verbose */
+					g_print ("Remaining data after invalid object location:\n");
+					gst_util_dump_mem (buf, buf_end - buf);
+					return; // FIXME: Perhaps tell read_nbit_string that dbuf_len is zero and let it walk the bytes regardless? (Same FIXME for 2bit and 8bit)
+				}
+
 				if (region->depth < 4) {
 					g_warning ("4-bit pixel string in %d-bit region!\n", region->depth);
 					return;
@@ -1137,6 +1155,13 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 				         "READ_nBIT_STRING (4) finished: buf pointer now %p", buf);
 				break;
 			case 0x12:
+				if (dest_buf_filled) {
+					g_warning ("Invalid object location for data_type 0x%x!\n", *(buf-1)); /* FIXME: Be more verbose */
+					g_print ("Remaining data after invalid object location:\n");
+					gst_util_dump_mem (buf, buf_end - buf);
+					return;
+				}
+
 				if (region->depth < 8) {
 					g_warning ("8-bit pixel string in %d-bit region!\n", region->depth);
 					return;
