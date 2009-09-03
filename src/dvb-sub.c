@@ -1105,10 +1105,10 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 				else
 					map_table = NULL;
 
-				/* FIXME: I don't see any guards about buffer size here - buf++ happens with the switch, but size
-				 * FIXME: passed is the global size apparently? */
+				// FFMPEG-FIXME: ffmpeg code passes buf_size instead of buf_end - buf, and could
+				// FFMPEG-FIXME: therefore potentially walk over the memory area we own
 				x_pos += _dvb_sub_read_2bit_string(pbuf + (y_pos * region->width) + x_pos,
-				                                   region->width - x_pos, &buf, buf_size,
+				                                   region->width - x_pos, &buf, buf_end - buf,
 				                                   non_mod, map_table);
 				break;
 			case 0x11:
@@ -1122,13 +1122,12 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 				else
 					map_table = NULL;
 
-				/* FIXME: I don't see any guards about buffer size here - buf++ happens with the switch, but size
-				 * FIXME: passed is the global size apparently? */
-
 				dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
 				         "READ_nBIT_STRING (4): String data into position %dx%d; buf before is %p\n", x_pos, y_pos, buf);
+				// FFMPEG-FIXME: ffmpeg code passes buf_size instead of buf_end - buf, and could
+				// FFMPEG-FIXME: therefore potentially walk over the memory area we own
 				x_pos += _dvb_sub_read_4bit_string(pbuf + (y_pos * region->width) + x_pos,
-				                                   region->width - x_pos, &buf, buf_size,
+				                                   region->width - x_pos, &buf, buf_end - buf,
 				                                   non_mod, map_table);
 				dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
 				         "READ_nBIT_STRING (4) finished: buf pointer now %p", buf);
@@ -1139,10 +1138,10 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 					return;
 				}
 
-				/* FIXME: I don't see any guards about buffer size here - buf++ happens with the switch, but size
-				 * FIXME: passed is the global size apparently? */
+				// FFMPEG-FIXME: ffmpeg code passes buf_size instead of buf_end - buf, and could
+				// FFMPEG-FIXME: therefore potentially walk over the memory area we own
 				x_pos += _dvb_sub_read_8bit_string(pbuf + (y_pos * region->width) + x_pos,
-				                                   region->width - x_pos, &buf, buf_size,
+				                                   region->width - x_pos, &buf, buf_end - buf,
 				                                   non_mod, NULL);
 				break;
 
