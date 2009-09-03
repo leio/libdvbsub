@@ -1107,10 +1107,8 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 		switch (*buf++) {
 			case 0x10:
 				if (dest_buf_filled) {
-					g_warning ("Invalid object location for data_type 0x%x!\n", *(buf-1)); /* FIXME: Be more verbose */
-					g_print ("Remaining data after invalid object location:\n");
+					g_warning ("Invalid object location for data_type 0x%x! Falling through to let it be parsed out\n", *(buf-1)); /* FIXME: Be more verbose */
 					gst_util_dump_mem (buf, buf_end - buf);
-					return;
 				}
 
 				if (region->depth == 8)
@@ -1123,15 +1121,13 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 				// FFMPEG-FIXME: ffmpeg code passes buf_size instead of buf_end - buf, and could
 				// FFMPEG-FIXME: therefore potentially walk over the memory area we own
 				x_pos += _dvb_sub_read_2bit_string(pbuf + (y_pos * region->width) + x_pos,
-				                                   region->width - x_pos, &buf, buf_end - buf,
-				                                   non_mod, map_table);
+				                                   dest_buf_filled ? 0 : (region->width - x_pos),
+				                                   &buf, buf_end - buf, non_mod, map_table);
 				break;
 			case 0x11:
 				if (dest_buf_filled) {
 					g_warning ("Invalid object location for data_type 0x%x!\n", *(buf-1)); /* FIXME: Be more verbose */
-					g_print ("Remaining data after invalid object location:\n");
 					gst_util_dump_mem (buf, buf_end - buf);
-					return; // FIXME: Perhaps tell read_nbit_string that dbuf_len is zero and let it walk the bytes regardless? (Same FIXME for 2bit and 8bit)
 				}
 
 				if (region->depth < 4) {
@@ -1149,17 +1145,15 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 				// FFMPEG-FIXME: ffmpeg code passes buf_size instead of buf_end - buf, and could
 				// FFMPEG-FIXME: therefore potentially walk over the memory area we own
 				x_pos += _dvb_sub_read_4bit_string(pbuf + (y_pos * region->width) + x_pos,
-				                                   region->width - x_pos, &buf, buf_end - buf,
-				                                   non_mod, map_table);
+				                                   dest_buf_filled ? 0 : (region->width - x_pos),
+				                                   &buf, buf_end - buf, non_mod, map_table);
 				dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
 				         "READ_nBIT_STRING (4) finished: buf pointer now %p", buf);
 				break;
 			case 0x12:
 				if (dest_buf_filled) {
 					g_warning ("Invalid object location for data_type 0x%x!\n", *(buf-1)); /* FIXME: Be more verbose */
-					g_print ("Remaining data after invalid object location:\n");
 					gst_util_dump_mem (buf, buf_end - buf);
-					return;
 				}
 
 				if (region->depth < 8) {
@@ -1170,8 +1164,8 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 				// FFMPEG-FIXME: ffmpeg code passes buf_size instead of buf_end - buf, and could
 				// FFMPEG-FIXME: therefore potentially walk over the memory area we own
 				x_pos += _dvb_sub_read_8bit_string(pbuf + (y_pos * region->width) + x_pos,
-				                                   region->width - x_pos, &buf, buf_end - buf,
-				                                   non_mod, NULL);
+				                                   dest_buf_filled ? 0 : (region->width - x_pos),
+				                                   &buf, buf_end - buf, non_mod, NULL);
 				break;
 
 			case 0x20:
