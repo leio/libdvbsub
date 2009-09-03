@@ -56,7 +56,11 @@ main (int argc, char *argv[])
 		return -1;
 	}
 
+#ifdef DVBSUB_TEST_FROM_GST_DUMP
+	dvb_sub_feed_with_pts (sub_parser, 0, (guchar*)file_buf, file_len);
+#else
 	dvb_sub_feed (sub_parser, (guchar*)file_buf, file_len);
+#endif
 
 	return 0;
 }
