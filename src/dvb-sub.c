@@ -1090,10 +1090,13 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 
 	while (buf < buf_end) {
 		dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-		         "Iteration start, %u bytes missing from end; buf = %p, buf_end = %p",
-		         buf_end - buf, buf, buf_end);
-		if (x_pos > region->width || y_pos > region->height) {
-			g_warning ("Invalid object location!\n"); /* FIXME: Be more verbose */
+		         "Iteration start, %u bytes missing from end; buf = %p, buf_end = %p;  "
+		         "Region is number %u, with a dimension of %dx%d; We are at position %dx%d",
+		         buf_end - buf, buf, buf_end,
+		         region->id, region->width, region->height, x_pos, y_pos);
+		// FFMPEG-FIXME: ffmpeg doesn't check for equality and so can overflow destination buffer later on with bad input data
+		if (x_pos >= region->width || y_pos >= region->height) {
+			g_warning ("Invalid object location for data_type 0x%x!\n", *buf); /* FIXME: Be more verbose */
 			return;
 		}
 
