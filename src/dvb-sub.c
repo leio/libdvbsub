@@ -948,6 +948,10 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 	guint32 bits;
 	guint32 pixels_read = 0;
 
+	dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+	         "Entering 4bit_string parser at srcbuf position %p with buf_size = %d; destination buffer size is %d @ %p",
+	         *srcbuf, buf_size, dbuf_len, destbuf);
+
 	while (!stop_parsing && (gst_bit_reader_get_remaining (&gb) > 0)) {
 		guint run_length = 0, clut_index = 0;
 		gst_bit_reader_get_bits_uint32 (&gb, &bits, 4);
@@ -1011,6 +1015,9 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 
 		/* Now we can simply memset run_length count of destination bytes
 		 * to clut_index, but only if not non_modifying */
+		dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+		         "Setting %u pixels to color 0x%x in destination buffer; dbuf_len left is %d pixels",
+		         run_length, clut_index, dbuf_len);
 		if (!(non_mod == 1 && bits == 1))
 			memset (destbuf, clut_index, run_length);
 
