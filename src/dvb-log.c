@@ -42,7 +42,8 @@ const char *dvb_log_type_list[] = {
 	"PIXEL",   /* DVB_LOG_PIXEL   */
 	"RUNLEN",  /* DVB_LOG_RUNLEN  */
 	"DISPLAY", /* DVB_LOG_DISPLAY */
-	"STREAM"   /* DVB_LOG_STREAM  */
+	"STREAM",  /* DVB_LOG_STREAM  */
+	"PACKET"   /* DVB_LOG_PACKET  */
 };
 
 /**

@@ -1651,12 +1651,13 @@ dvb_sub_feed (DvbSub *dvb_sub, guint8 *data, gint len)
 	guint8 PES_packet_header_len;
 	gint counter = 0;
 
-	g_print ("Inside dvb_sub_feed with length %d\n", len);
+	dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
+	         "Inside dvb_sub_feed with length %d\n", len);
 
 	while (TRUE) {
 		++counter;
-		g_print ("=============== PES packet number %04u ===============\n", counter);
-		g_print ("At position %u\n", pos);
+		dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
+		         "=============== PES packet number %04u ===============\nAt position %u", counter, pos);
 		data = data + pos;
 		len = len - pos;
 		total_pos += pos;
@@ -1731,7 +1732,8 @@ dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8* data, gint len)
 	guint16 segment_len;
 	guint16 page_id;
 
-	g_print ("Inside dvb_sub_feed_with_pts with pts=%" G_GUINT64_FORMAT " and length %d\n", pts, len);
+	dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
+	         "Inside dvb_sub_feed_with_pts with pts=%" G_GUINT64_FORMAT " and length %d", pts, len);
 
 	g_return_val_if_fail (data != NULL, -1);
 
@@ -1756,12 +1758,15 @@ dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8* data, gint len)
 			return -2;
 		}
 		segment_type = data[pos++];
-		g_print ("=== Segment type is 0x%x\n", segment_type);
+		dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
+		         "=== Segment type is 0x%x", segment_type);
 		page_id = (data[pos] << 8) | data[pos+1];
-		g_print ("page_id is 0x%x\n", page_id);
+		dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
+		         "page_id is 0x%x", page_id);
 		pos += 2;
 		segment_len = (data[pos] << 8) | data[pos+1];
-		g_print ("segment_length is %d (0x%x 0x%x)\n", segment_len, data[pos], data[pos+1]);
+		dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
+		         "segment_length is %d (0x%x 0x%x)", segment_len, data[pos], data[pos+1]);
 		pos += 2;
 		if ((len - pos) < segment_len) {
 			g_warning ("segment_length was told to be %u, but we only have %d bytes left", segment_len, len - pos);
@@ -1929,7 +1934,7 @@ dvb_sub_read_data (DvbSub *dvb_sub)
 
 	while ((len_read = read (priv->fd, buf, 4096))) {
 		if (len_read < 0) {
-			perror ("read");
+			g_warning ("Error during demux file descriptor read. Code: %d, message: %s", errno, strerror(errno));
 			/* FIXME: What should we actually do here? */
 			break;
 		}
@@ -1937,7 +1942,8 @@ dvb_sub_read_data (DvbSub *dvb_sub)
 		g_string_append_len (data, buf, len_read);
 	}
 
-	g_print ("read_data called by API user, feeding %" G_GSIZE_FORMAT " bytes into DVB subtitle parser\n", data->len);
+	dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
+	         "read_data called by API user, feeding %" G_GSIZE_FORMAT " bytes into DVB subtitle parser", data->len);
 	dvb_sub_feed (dvb_sub, (guint8 *)data->str, data->len);
 	g_string_free (data, TRUE);
 }

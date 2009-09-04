@@ -43,6 +43,7 @@ typedef enum
 	DVB_LOG_RUNLEN,  /* RUNLEN */
 	DVB_LOG_DISPLAY, /* DISPLAY */
 	DVB_LOG_STREAM,  /* STREAM - issues in the encoded stream (TV service provider encoder problem) */
+	DVB_LOG_PACKET,  /* PACKET - messages during raw demuxer data packet handling */
 	DVB_LOG_LAST  /* sentinel use only */
 } DvbLogTypes;
 
