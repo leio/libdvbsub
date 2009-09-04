@@ -121,6 +121,8 @@ typedef struct DVBSubRegion
 	int buf_size;
 
 	DVBSubObjectDisplay *display_list;
+
+	struct DVBSubRegion *next;
 } DVBSubRegion;
 
 typedef struct _DvbSubPrivate DvbSubPrivate;
@@ -131,7 +133,7 @@ struct _DvbSubPrivate
 	gpointer user_data;
 
 	guint8 page_time_out;
-	GSList *region_list;
+	DVBSubRegion *region_list;
 	GSList *clut_list;
 	GSList *object_list;
 	/* FIXME... */
@@ -176,17 +178,18 @@ get_clut (DvbSub *dvb_sub, gint clut_id)
 	return list ? (DVBSubCLUT *)list->data : NULL;
 }
 
+// FIXME: Just pass private_data pointer directly here and in other get_* helper functions?
 static DVBSubRegion*
 get_region (DvbSub *dvb_sub, guint8 region_id)
 {
 	const DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
-	GSList *list = priv->region_list;
+	DVBSubRegion *ptr = priv->region_list;
 
-	while (list && ((DVBSubRegion *)list->data)->id != region_id) {
-		list = g_slist_next (list);
+	while (ptr && ptr->id != region_id) {
+		ptr = ptr->next;
 	}
 
-	return list ? (DVBSubRegion *)list->data : NULL;
+	return ptr;
 }
 
 static void
@@ -423,7 +426,8 @@ _dvb_sub_parse_region_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 	if (!region) { /* Create a new region */
 		region = g_slice_new0 (DVBSubRegion);
 		region->id = region_id;
-		priv->region_list = g_slist_prepend (priv->region_list, region);
+		region->next = priv->region_list;
+		priv->region_list = region;
 	}
 
 	fill = ((*buf++) >> 3) & 1;
