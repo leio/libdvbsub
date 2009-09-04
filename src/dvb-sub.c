@@ -1587,6 +1587,10 @@ dvb_sub_feed (DvbSub *dvb_sub, guint8 *data, gint len)
 		len = len - pos;
 		total_pos += pos;
 		pos = 0;
+
+		if (len == 0)
+			return 0;
+
 		if (len <= 3) {
 			g_warning ("Length %d too small for further processing. Finishing after %u bytes have been processed", len, total_pos);
 			return -1;
