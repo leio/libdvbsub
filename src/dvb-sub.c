@@ -1693,6 +1693,10 @@ dvb_sub_feed (DvbSub *dvb_sub, guint8 *data, gint len)
 
 		/* FIXME: If the packet is cut, we could be feeding data more than we actually have here, which breaks everything. Probably need to buffer up and handle it,
 		 * FIXME: Or push back in front to the file descriptor buffer (but we are using read, not libc buffered fread, so that idea might not be possible )*/
+		if (pos > len) {
+			g_warning ("!!!!!!!!!!! claimed PES packet length was %d, but we only had %d bytes left... Cut packet, ignoring !!!!!!!!!", PES_packet_len, len);
+			return -4;
+		}
 		dvb_sub_feed_with_pts (dvb_sub, pts, data + pos, PES_packet_len - PES_packet_header_len - 3); /* 2 bytes between PES_packet_len and PES_packet_header_len fields, minus header_len itself */
 		pos += PES_packet_len - PES_packet_header_len - 3;
 		g_print("Finished PES packet number %u\n", counter);
