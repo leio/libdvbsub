@@ -203,7 +203,23 @@ delete_region_display_list (DvbSub *dvb_sub, DVBSubRegion *region)
 static void
 delete_state(DvbSub *dvb_sub)
 {
-	/* FIXME: Implement */
+	DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
+	DVBSubRegion *region;
+
+	while (priv->region_list) {
+		region = priv->region_list;
+
+		priv->region_list = region->next;
+
+		delete_region_display_list (dvb_sub, region);
+		if (region->pbuf)
+			g_free (region->pbuf);
+
+		g_slice_free (DVBSubRegion, region);
+	}
+
+	g_slice_free_chain (DVBSubCLUT, priv->clut_list, next);
+	priv->clut_list = NULL;
 }
 
 static void
