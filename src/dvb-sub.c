@@ -1934,7 +1934,8 @@ dvb_sub_read_data (DvbSub *dvb_sub)
 
 	while ((len_read = read (priv->fd, buf, 4096))) {
 		if (len_read < 0) {
-			g_warning ("Error during demux file descriptor read. Code: %d, message: %s", errno, strerror(errno));
+			if (errno != EAGAIN)
+				g_warning ("Error during demux file descriptor read. Code: %d, message: %s", errno, strerror(errno));
 			/* FIXME: What should we actually do here? */
 			break;
 		}
