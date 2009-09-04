@@ -61,11 +61,13 @@ static guint8 ff_cropTbl[256 + 2 * MAX_NEG_CROP] = { 0, };
 #define RGBA(r,g,b,a) (((a) << 24) | ((r) << 16) | ((g) << 8) | (b))
 
 typedef struct DVBSubCLUT {
-    int id; /* default_clut uses -1 for this, so guint8 isn't fine without adaptations first */
+	int id; /* default_clut uses -1 for this, so guint8 isn't fine without adaptations first */
 
-    guint32 clut4[4];
-    guint32 clut16[16];
-    guint32 clut256[256];
+	guint32 clut4[4];
+	guint32 clut16[16];
+	guint32 clut256[256];
+
+	struct DVBSubCLUT *next;
 } DVBSubCLUT;
 
 static DVBSubCLUT default_clut;
@@ -134,7 +136,7 @@ struct _DvbSubPrivate
 
 	guint8 page_time_out;
 	DVBSubRegion *region_list;
-	GSList *clut_list;
+	DVBSubCLUT *clut_list;
 	GSList *object_list;
 	/* FIXME... */
 	int display_list_size;
@@ -169,13 +171,13 @@ static DVBSubCLUT *
 get_clut (DvbSub *dvb_sub, gint clut_id)
 {
 	const DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
-	GSList *list = priv->clut_list;
+	DVBSubCLUT *ptr = priv->clut_list;
 
-	while (list && ((DVBSubCLUT *)list->data)->id != clut_id) {
-		list = g_slist_next (list);
+	while (ptr && ptr->id != clut_id) {
+		ptr = ptr->next;
 	}
 
-	return list ? (DVBSubCLUT *)list->data : NULL;
+	return ptr;
 }
 
 // FIXME: Just pass private_data pointer directly here and in other get_* helper functions?
@@ -554,7 +556,8 @@ _dvb_sub_parse_clut_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint
 
 		clut->id = clut_id;
 
-		priv->clut_list = g_slist_prepend (priv->clut_list, clut);
+		clut->next = priv->clut_list;
+		priv->clut_list = clut;
 	}
 
 	while (buf + 4 < buf_end) {
