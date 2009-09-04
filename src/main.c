@@ -56,8 +56,20 @@ main (int argc, char *argv[])
 		return -1;
 	}
 
+//#define DVBSUB_TEST_FROM_GST_DUMP
 #ifdef DVBSUB_TEST_FROM_GST_DUMP
-	dvb_sub_feed_with_pts (sub_parser, 0, (guchar*)file_buf, file_len);
+	{
+		int parsed_len;
+		while (file_len > 0) {
+			parsed_len = dvb_sub_feed_with_pts (sub_parser, 0, (guchar*)file_buf, file_len);
+			if (parsed_len < 0) {
+				g_warning ("dvb_sub_feed_with_pts returned with an error. Code = %d", parsed_len);
+				break;
+			}
+			file_len -= parsed_len;
+			file_buf += parsed_len;
+		}
+	}
 #else
 	dvb_sub_feed (sub_parser, (guchar*)file_buf, file_len);
 #endif
