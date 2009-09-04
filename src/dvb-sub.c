@@ -1324,6 +1324,8 @@ _dvb_sub_parse_object_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 			return;
 		}
 
+		/* FIXME: Potential optimization opportunity here - parse the object pixmap only once, and copy it to all the
+		 * FIXME: regions that need it. One object being in multiple regions is a rare occurrence in real life, however */
 		for (display = object->display_list; display; display = display->object_list_next) {
 			block = buf;
 
