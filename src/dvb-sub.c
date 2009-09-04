@@ -937,6 +937,8 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 
 #else
 
+// FFMPEG-FIXME: The same code in ffmpeg is much more complex, it could use the same
+// FFMPEG-FIXME: refactoring as done here, explained in commit 895296c3
 static int
 _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
                           const guint8 **srcbuf, gint buf_size,
