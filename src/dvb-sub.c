@@ -1696,7 +1696,7 @@ dvb_sub_feed (DvbSub *dvb_sub, guint8 *data, gint len)
 		pos += PES_packet_len - PES_packet_header_len - 3;
 		g_print("Finished PES packet number %u\n", counter);
 	}
-	return 0; /* FIXME */
+	return total_pos; /* FIXME */
 }
 
 #define DVB_SUB_SEGMENT_PAGE_COMPOSITION 0x10
@@ -1721,7 +1721,7 @@ dvb_sub_feed (DvbSub *dvb_sub, guint8 *data, gint len)
  *
  * Return value: -1 if data was unhandled (e.g, not a subtitle packet),
  *				 -2 if data parsing was unsuccesful (e.g, length was invalid),
- *				  0 or positive if data was handled. FIXME: List the positive return values.
+ *				  0 or positive if data was handled. If positive, then amount of data consumed on success. FIXME: List the positive return values.
  */
 gint
 dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8* data, gint len)
@@ -1803,7 +1803,7 @@ dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8* data, gint len)
 		}
 	}
 
-	return -2;
+	return pos;
 }
 
 
