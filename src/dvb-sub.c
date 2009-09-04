@@ -197,7 +197,49 @@ get_region (DvbSub *dvb_sub, guint8 region_id)
 static void
 delete_region_display_list (DvbSub *dvb_sub, DVBSubRegion *region)
 {
-	/* FIXME: Fill in with proper object data deletion after the creation is done... */
+	const DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
+	DVBSubObject *object, *obj2;
+	DVBSubObject** obj2_ptr;
+	DVBSubObjectDisplay *display, *obj_disp, **obj_disp_ptr;
+
+	while (region->display_list) {
+		display = region->display_list;
+
+		object = get_object (dvb_sub, display->object_id);
+
+		if (object) {
+			obj_disp_ptr = &object->display_list;
+			obj_disp = *obj_disp_ptr;
+
+			while (obj_disp && obj_disp != display) {
+				obj_disp_ptr = &obj_disp->object_list_next;
+				obj_disp = *obj_disp_ptr;
+			}
+
+			if (obj_disp) {
+				*obj_disp_ptr = obj_disp->object_list_next;
+
+				if (!object->display_list) {
+					obj2_ptr = &priv->object_list;
+					obj2 = *obj2_ptr;
+
+					while (obj2 != object) {
+						g_assert (obj2);
+						obj2_ptr = &obj2->next;
+						obj2 = *obj2_ptr;
+					}
+
+					*obj2_ptr = obj2->next;
+
+					g_slice_free (DVBSubObject, obj2);
+				}
+			}
+		}
+
+		region->display_list = display->region_list_next;
+
+		g_slice_free (DVBSubObjectDisplay, display);
+	}
 }
 
 static void
@@ -220,6 +262,10 @@ delete_state(DvbSub *dvb_sub)
 
 	g_slice_free_chain (DVBSubCLUT, priv->clut_list, next);
 	priv->clut_list = NULL;
+
+	/* Should already be null */
+	if (priv->object_list)
+		g_warning("Memory deallocation error!");
 }
 
 static void
