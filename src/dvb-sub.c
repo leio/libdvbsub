@@ -137,7 +137,7 @@ struct _DvbSubPrivate
 	guint8 page_time_out;
 	DVBSubRegion *region_list;
 	DVBSubCLUT *clut_list;
-	GSList *object_list;
+	DVBSubObject *object_list;
 	/* FIXME... */
 	int display_list_size;
 	DVBSubRegionDisplay *display_list;
@@ -158,13 +158,13 @@ static DVBSubObject *
 get_object (DvbSub *dvb_sub, guint16 object_id)
 {
 	const DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
-	GSList *list = priv->object_list;
+	DVBSubObject *ptr = priv->object_list;
 
-	while (list && ((DVBSubObject *)list->data)->id != object_id) {
-		list = g_slist_next (list);
+	while (ptr && ptr->id != object_id) {
+		ptr = ptr->next;
 	}
 
-	return list ? (DVBSubObject *)list->data : NULL;
+	return ptr;
 }
 
 static DVBSubCLUT *
@@ -491,7 +491,9 @@ _dvb_sub_parse_region_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 			object = g_slice_new0 (DVBSubObject);
 
 			object->id = object_id;
-			priv->object_list = g_slist_prepend (priv->object_list, object);
+
+			object->next = priv->object_list;
+			priv->object_list = object;
 		}
 
 		object->type = (*buf) >> 6;
