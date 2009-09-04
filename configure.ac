@@ -32,7 +32,7 @@ dnl Have we asked for debugging?
 if test "$enable_debug" = yes ; then
     DEBUGFLAGS="-g -DDEBUG"
 else
-    DEBUGFLAGS=""
+    DEBUGFLAGS="-DG_DISABLE_ASSERT"
 fi
 
 AC_SUBST(DEBUGFLAGS)
