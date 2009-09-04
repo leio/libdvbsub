@@ -1510,7 +1510,7 @@ _dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *buf
 {
 	DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
 
-	DVBSubtitles *sub = g_slice_new0 (DVBSubtitles); /* FIXME: Free the contents and it itself afterwards...; FIXME: Do we need to zero-init? */
+	DVBSubtitles *sub = g_slice_new0 (DVBSubtitles); /* FIXME-MEMORY-LEAK: Free the contents and it itself afterwards...; FIXME: Do we need to zero-init? */
 
 	DVBSubRegion *region;
 	DVBSubRegionDisplay *display;
@@ -1531,7 +1531,8 @@ _dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *buf
 
 	sub->num_rects = priv->display_list_size;
 
-	if (sub->num_rects > 0){
+	if (sub->num_rects > 0) {
+		// FIXME-MEMORY-LEAK: This structure is not freed up yet
 		sub->rects = g_malloc0 (sizeof(*sub->rects) * sub->num_rects); /* GSlice? */
 		for(i=0; i<sub->num_rects; i++)
 			sub->rects[i] = g_malloc0 (sizeof(*sub->rects[i])); /* GSlice? */
