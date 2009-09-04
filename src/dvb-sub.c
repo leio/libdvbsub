@@ -1643,7 +1643,7 @@ dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8* data, gint len)
 	guint16 segment_len;
 	guint16 page_id;
 
-	g_print ("Inside dvb_sub_feed_with_pts with pts=%lu and length %d\n", pts, len);
+	g_print ("Inside dvb_sub_feed_with_pts with pts=%" G_GUINT64_FORMAT " and length %d\n", pts, len);
 
 	g_return_val_if_fail (data != NULL, -1);
 
