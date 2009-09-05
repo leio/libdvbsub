@@ -614,7 +614,7 @@ _dvb_sub_parse_clut_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint
 	clut = get_clut(dvb_sub, clut_id);
 
 	if (!clut) {
-		clut = g_slice_new (DVBSubCLUT);
+		clut = g_slice_new (DVBSubCLUT); /* FIXME-MEMORY-LEAK: This seems to leak per valgrind */
 
 		memcpy(clut, &default_clut, sizeof(DVBSubCLUT));
 
@@ -1510,7 +1510,7 @@ _dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *buf
 {
 	DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
 
-	DVBSubtitles *sub = g_slice_new0 (DVBSubtitles); /* FIXME-MEMORY-LEAK: Free the contents and it itself afterwards...; FIXME: Do we need to zero-init? */
+	DVBSubtitles *sub = g_slice_new0 (DVBSubtitles);
 
 	DVBSubRegion *region;
 	DVBSubRegionDisplay *display;
@@ -1610,6 +1610,17 @@ _dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *buf
 
 	if (priv->callbacks.new_data)
 		priv->callbacks.new_data (dvb_sub, sub, priv->page_time_out, priv->user_data);
+
+	/* Now free up all the temporary memory we allocated */
+	for (i = 0; i < sub->num_rects; ++i) {
+		rect = sub->rects[i];
+
+		g_free (rect->pict.palette);
+		g_free (rect->pict.data);
+		g_free (rect);
+	}
+	g_free (sub->rects);
+	g_slice_free (DVBSubtitles, sub);
 
 	return 1; /* FIXME: The caller of this function is probably supposed to do something with the return value */
 }
