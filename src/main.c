@@ -74,5 +74,8 @@ main (int argc, char *argv[])
 	dvb_sub_feed (sub_parser, (guchar*)file_buf, file_len);
 #endif
 
+	g_free (file_buf);
+	g_object_unref (sub_parser);
+
 	return 0;
 }
