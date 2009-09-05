@@ -1592,14 +1592,15 @@ _dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *buf
 
 		static unsigned counter = 0;
 		++counter;
-		g_print ("An object rect created: number %u, iteration %u, pos: %d:%d, size: %dx%d\n", counter, i,
+		dvb_log (DVB_LOG_DISPLAY, G_LOG_LEVEL_DEBUG,
+		         "An object rect created: number %u, iteration %u, pos: %d:%d, size: %dx%d", counter, i,
 		         rect->x, rect->y, rect->w, rect->h);
 #if 0
 		g_print ("rect->pict.data content:\n");
 		gst_util_dump_mem (rect->pict.data, region->buf_size);
 #endif
 
-		i++;
+		++i;
 	}
 
 	sub->num_rects = i;
