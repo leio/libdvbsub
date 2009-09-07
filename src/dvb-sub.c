@@ -1927,6 +1927,7 @@ dvb_sub_close_pid (DvbSub *dvb_sub)
 
 	close (priv->fd);
 	priv->fd = -1;
+	delete_state (dvb_sub);
 }
 
 /**
