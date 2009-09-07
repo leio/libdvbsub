@@ -582,13 +582,13 @@ _dvb_sub_parse_region_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gi
 		object_display->object_list_next = object->display_list;
 		object->display_list = object_display;
 
-		g_print ("REGION DATA: object_id = %u, region_id = %u, pos = %ux%u, obj_type = %u",
+		dvb_log (DVB_LOG_REGION, G_LOG_LEVEL_DEBUG,
+		         "REGION DATA: object_id = %u, region_id = %u, pos = %ux%u, obj_type = %u",
 		         object->id, region->id, object_display->x_pos, object_display->y_pos,
 		         object->type);
 		if (object->type == 1 || object->type == 2)
-			g_print (", fgcolor = %u, bgcolor = %u\n", object_display->fgcolor, object_display->bgcolor);
-		else
-			g_print ("\n");
+			dvb_log (DVB_LOG_REGION, G_LOG_LEVEL_DEBUG,
+			         "REGION DATA: fgcolor = %u, bgcolor = %u\n", object_display->fgcolor, object_display->bgcolor);
 	}
 }
 
@@ -1793,23 +1793,27 @@ dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8* data, gint len)
 		// TODO: Parse the segment per type
 		switch (segment_type) {
 			case DVB_SUB_SEGMENT_PAGE_COMPOSITION:
-				g_print ("Page composition segment at buffer pos %u\n", pos);
+				dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
+				         "Page composition segment at buffer pos %u\n", pos);
 				_dvb_sub_parse_page_segment (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
 				break;
 			case DVB_SUB_SEGMENT_REGION_COMPOSITION:
-				g_print ("Region composition segment at buffer pos %u\n", pos);
+				dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
+				         "Region composition segment at buffer pos %u\n", pos);
 				_dvb_sub_parse_region_segment (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
 				break;
 			case DVB_SUB_SEGMENT_CLUT_DEFINITION:
-				g_print ("CLUT definition segment at buffer pos %u\n", pos);
+				dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
+				         "CLUT definition segment at buffer pos %u\n", pos);
 				_dvb_sub_parse_clut_segment (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
 				break;
 			case DVB_SUB_SEGMENT_OBJECT_DATA:
-				g_print ("Object data segment at buffer pos %u\n", pos);
+				dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,"Object data segment at buffer pos %u\n", pos);
 				_dvb_sub_parse_object_segment (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
 				break;
 			case DVB_SUB_SEGMENT_END_OF_DISPLAY_SET:
-				g_print ("End of display set at buffer pos %u\n", pos);
+				dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
+				         "End of display set at buffer pos %u\n", pos);
 				_dvb_sub_parse_end_of_display_set (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
 				break;
 			default:
