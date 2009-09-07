@@ -290,7 +290,8 @@ dvb_sub_finalize (GObject *object)
 	DvbSubPrivate *priv = (DvbSubPrivate *)self->private_data;
 	/* TODO: Add deinitalization code here */
 	/* FIXME: Clear up region_list contents */
-	delete_state (self);
+	dvb_sub_close_pid (self);
+	delete_state (self); /* close_pid should have called this, but lets be sure */
 
 	G_OBJECT_CLASS (dvb_sub_parent_class)->finalize (object);
 }
