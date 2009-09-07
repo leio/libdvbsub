@@ -141,7 +141,6 @@ struct _DvbSubPrivate
 	/* FIXME... */
 	int display_list_size;
 	DVBSubRegionDisplay *display_list;
-	GString *packet_store;
 };
 
 #define DVB_SUB_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), DVB_TYPE_SUB, DvbSubPrivate))
@@ -264,9 +263,6 @@ delete_state(DvbSub *dvb_sub)
 	g_slice_free_chain (DVBSubCLUT, priv->clut_list, next);
 	priv->clut_list = NULL;
 
-	if (priv->packet_store != NULL)
-		g_string_free (priv->packet_store, TRUE);
-
 	/* Should already be null */
 	if (priv->object_list)
 		g_warning("Memory deallocation error!");
@@ -285,7 +281,6 @@ dvb_sub_init (DvbSub *self)
 	priv->region_list = NULL;
 	priv->object_list = NULL;
 	priv->page_time_out = 0; /* FIXME: Maybe 255 instead? */
-	priv->packet_store = NULL;
 }
 
 static void
@@ -1659,7 +1654,7 @@ dvb_sub_new (void)
  * The data given must be a full PES packet, which must
  * include a PTS field in the headers.
  *
- * Return value: a negative value on errors; Amount of data NOT consumed in other cases. If this is positive, the caller might have to deal with cut packet glueing.
+ * Return value: a negative value on errors; Amount of data consumed on success. TODO
  */
 gint
 dvb_sub_feed (DvbSub *dvb_sub, guint8 *data, gint len)
@@ -1708,8 +1703,8 @@ dvb_sub_feed (DvbSub *dvb_sub, guint8 *data, gint len)
 		/* FIXME: If the packet is cut, we could be feeding data more than we actually have here, which breaks everything. Probably need to buffer up and handle it,
 		 * FIXME: Or push back in front to the file descriptor buffer (but we are using read, not libc buffered fread, so that idea might not be possible )*/
 		if ((len - 5) < PES_packet_len) {
-			g_warning ("!!!!!!! claimed PES packet length was %d, but we only had %d bytes left... Cut packet, buffering and waiting for next packet", PES_packet_len, len - 5);
-			return len;
+			g_warning ("!!!!!!!!!!! claimed PES packet length was %d, but we only had %d bytes left... Cut packet, ignoring !!!!!!!!!", PES_packet_len, len - 5);
+			return -4;
 		}
 		/* FIXME: Validate sizes inbetween here */
 
@@ -1721,7 +1716,7 @@ dvb_sub_feed (DvbSub *dvb_sub, guint8 *data, gint len)
 		pos += PES_packet_len - PES_packet_header_len - 3;
 		g_print("Finished PES packet number %u\n", counter);
 	}
-	return 0; /* FIXME */
+	return total_pos; /* FIXME */
 }
 
 #define DVB_SUB_SEGMENT_PAGE_COMPOSITION 0x10
@@ -1948,9 +1943,9 @@ void
 dvb_sub_read_data (DvbSub *dvb_sub)
 {
 	DvbSubPrivate *priv;
+	GString *data; /* FIXME: Probably don't use GString in the long run? */
 	gchar buf[4096];
 	ssize_t len_read;
-	gint len_remaining;
 
 	g_return_if_fail (dvb_sub != NULL);
 	g_return_if_fail (DVB_IS_SUB (dvb_sub));
@@ -1959,8 +1954,7 @@ dvb_sub_read_data (DvbSub *dvb_sub)
 
 	g_return_if_fail (priv->fd >= 0);
 
-	if (priv->packet_store == NULL)
-		priv->packet_store = g_string_sized_new (4096);
+	data = g_string_sized_new (4096);
 
 	while ((len_read = read (priv->fd, buf, 4096))) {
 		if (len_read < 0) {
@@ -1970,18 +1964,13 @@ dvb_sub_read_data (DvbSub *dvb_sub)
 			break;
 		}
 
-		g_string_append_len (priv->packet_store, buf, len_read);
+		g_string_append_len (data, buf, len_read);
 	}
 
 	dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
 	         "read_data called by API user, feeding %" G_GSIZE_FORMAT " bytes into DVB subtitle parser", data->len);
-	len_remaining = dvb_sub_feed (dvb_sub, (guint8 *)(priv->packet_store->str), priv->packet_store->len);
-	if (len_remaining > 0) {
-		g_string_erase (priv->packet_store, 0, priv->packet_store->len - len_remaining);
-	} else {
-		g_string_free (priv->packet_store, TRUE);
-		priv->packet_store = NULL;
-	}
+	dvb_sub_feed (dvb_sub, (guint8 *)data->str, data->len);
+	g_string_free (data, TRUE);
 }
 
 /**
