@@ -1974,7 +1974,7 @@ dvb_sub_read_data (DvbSub *dvb_sub)
 	}
 
 	dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
-	         "read_data called by API user, feeding %" G_GSIZE_FORMAT " bytes into DVB subtitle parser", data->len);
+	         "read_data called by API user, feeding %" G_GSIZE_FORMAT " bytes into DVB subtitle parser", priv->packet_store->len);
 	len_remaining = dvb_sub_feed (dvb_sub, (guint8 *)(priv->packet_store->str), priv->packet_store->len);
 	if (len_remaining > 0) {
 		g_string_erase (priv->packet_store, 0, priv->packet_store->len - len_remaining);
