@@ -76,6 +76,7 @@ main (int argc, char *argv[])
 
 	g_free (file_buf);
 	g_object_unref (sub_parser);
+	g_option_context_free (context);
 
 	return 0;
 }
