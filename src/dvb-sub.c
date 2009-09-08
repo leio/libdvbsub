@@ -912,12 +912,15 @@ _dvb_sub_read_8bit_string(guint8 *destbuf, gint dbuf_len,
 		} else { /* 8-bit_zero */
 			gst_bit_reader_get_bits_uint32 (&gb, &bits, 1);
 			if (bits == 0) { /* switch_1 == '0' */
+				/* run_length_1-127 for pseudo-colour _entry) '0x00' */
 				gst_bit_reader_get_bits_uint32 (&gb, &run_length, 7);
-				if (run_length == 0) {
+				if (run_length == 0) { /* end_of_string_signal */
 					stop_parsing = TRUE;
 				}
 			} else { /* switch_1 == '1' */
+				/* run_length_3-127 */
 				gst_bit_reader_get_bits_uint32 (&gb, &run_length, 7);
+				gst_bit_reader_get_bits_uint32 (&gb, &clut_index, 8);
 #ifdef DEBUG
 				/* Emit a debugging message about stream not following specification */
 				if (run_length < 3) {
@@ -926,7 +929,6 @@ _dvb_sub_read_8bit_string(guint8 *destbuf, gint dbuf_len,
 					         run_length);
 				}
 #endif
-				gst_bit_reader_get_bits_uint32 (&gb, &clut_index, 8);
 			}
 		}
 
