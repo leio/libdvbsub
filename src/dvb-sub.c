@@ -815,202 +815,6 @@ _dvb_sub_read_2bit_string(guint8 *destbuf, gint dbuf_len,
 	return pixels_read;
 }
 
-#if 0
-static int
-_dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
-                          const guint8 **srcbuf, gint buf_size,
-                          guint8 non_mod, guint8 *map_table)
-{
-	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-	         "(n=4): Inside %s with dbuf_len = %d; scribbling on %p", __PRETTY_FUNCTION__, dbuf_len, destbuf);
-
-	GstBitReader gb = GST_BIT_READER_INIT (*srcbuf, buf_size);
-	/* FIXME: Handle FALSE returns from gst_bit_reader_get_* calls? */
-
-	guint32 bits;
-	guint run_length;
-	int pixels_read = 0;
-
-	//gst_util_dump_mem (*srcbuf, buf_size);
-
-	while (gst_bit_reader_get_pos (&gb) < buf_size << 3 && pixels_read < dbuf_len) {
-		gst_bit_reader_get_bits_uint32 (&gb, &bits, 4);
-
-		if (bits) {
-			dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
-			         "4-bit_pixel-code");
-			if (non_mod != 1 || bits != 1) {
-				if (map_table) {
-					dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
-					         "(n=4): Putting pixel code 0x%x in destbuf per mapping table, original bit value is 0x%x",
-					         map_table[bits], bits);
-					*destbuf++ = map_table[bits];
-				} else {
-					dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
-					         "(n=4): Putting pixel code 0x%x in destbuf (no mapping table)", bits);
-					*destbuf++ = bits;
-				}
-			} else {
-				dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
-				         "(n=4): Non-modifying color, leaving one pixel hole");
-			}
-			pixels_read++;
-		} else {
-			dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
-			         "4-bit_zero");
-			gst_bit_reader_get_bits_uint32 (&gb, &bits, 1);
-			if (bits == 0) {
-				dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
-				         "switch_1 == '0'");
-				gst_bit_reader_get_bits_uint32 (&gb, &run_length, 3);
-
-				if (run_length == 0) {
-					/* TODO: What does this case entail exactly? Skipping of remaining data correct? */
-					dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-					         "end_of_string_signal");
-					/* FIXME-FFMPEG? ffmpeg had the equal of gst_bit_reader_get_pos here, which seems logical but
-					 * FIXME-FFMPEG? get_remaining works better with current code for some reason. Figure out
-					 * FIXME-FFMPEG? what the problem is with get_pos and any changes for that might need ffmpeg
-					 * FIXME-FFMPEG? backports too. Just consuming all data doesn't leave good results either.
-					 * Worth looking into it more when the existing warnings in test data are fixed, as those might
-					 * muddy the waters here. */
-					(*srcbuf) += (gst_bit_reader_get_remaining (&gb) + 7) >> 3;
-					//(*srcbuf) += buf_size;
-					return pixels_read;
-				}
-
-				run_length += 2;
-
-				dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
-				         "run_length_3-9 => Setting %u pixels to pseudo-color 0", run_length);
-				if (map_table)
-					bits = map_table[0];
-				else
-					bits = 0;
-
-				while (run_length-- > 0 && pixels_read < dbuf_len) {
-					*destbuf++ = bits;
-					pixels_read++;
-				}
-			} else {
-				dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
-				         "switch_1 == '1'");
-				gst_bit_reader_get_bits_uint32 (&gb, &bits, 1);
-				if (bits == 0) {
-					dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
-					         "switch_2 == '0'");
-					gst_bit_reader_get_bits_uint32 (&gb, &run_length, 2);
-					run_length += 4;
-					gst_bit_reader_get_bits_uint32 (&gb, &bits, 4);
-
-					dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
-					         "run_length == %u; bits == 0x%x", run_length, bits);
-					if (non_mod == 1 && bits == 1)
-						pixels_read += run_length;
-					else {
-						if (map_table)
-							bits = map_table[bits];
-						while (run_length-- > 0 && pixels_read < dbuf_len) {
-							*destbuf++ = bits;
-							pixels_read++;
-						}
-					}
-				} else {
-					dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
-					         "switch_2 == '1'");
-					gst_bit_reader_get_bits_uint32 (&gb, &bits, 2);
-					if (bits == 2) {
-						dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
-						         "switch_3 == '10'");
-						gst_bit_reader_get_bits_uint32 (&gb, &run_length, 4);
-						run_length += 9;
-						gst_bit_reader_get_bits_uint32 (&gb, &bits, 4);
-
-						dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
-						         "run_length == %u; bits == 0x%x", run_length, bits);
-
-						if (non_mod == 1 && bits == 1)
-							pixels_read += run_length;
-						else {
-							if (map_table)
-								bits = map_table[bits];
-							while (run_length-- > 0 && pixels_read < dbuf_len) {
-								*destbuf++ = bits;
-								pixels_read++;
-							}
-						}
-					} else if (bits == 3) {
-						dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
-						         "switch_3 == '11'");
-						gst_bit_reader_get_bits_uint32 (&gb, &run_length, 8);
-						run_length += 25;
-						gst_bit_reader_get_bits_uint32 (&gb, &bits, 4);
-
-						dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
-						         "run_length == %u; bits == 0x%x", run_length, bits);
-
-						if (non_mod == 1 && bits == 1)
-							pixels_read += run_length;
-						else {
-							if (map_table)
-								bits = map_table[bits];
-							while (run_length-- > 0 && pixels_read < dbuf_len) {
-								*destbuf++ = bits;
-								pixels_read++;
-							}
-						}
-					} else if (bits == 1) {
-						dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
-						         "switch_3 == '01' => 2 pixels of pseudo-color '0000'");
-						pixels_read += 2;
-						if (map_table)
-							bits = map_table[0];
-						else
-							bits = 0;
-						if (pixels_read <= dbuf_len) {
-							*destbuf++ = bits;
-							*destbuf++ = bits;
-						}
-					} else {
-						dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
-						         "switch_3 == '00' (0x%x) => 1 pixel of pseudo-color '0000'", bits);
-						if (map_table)
-							bits = map_table[0];
-						else
-							bits = 0;
-						*destbuf++ = bits;
-						pixels_read ++;
-					}
-				}
-			}
-		}
-	}
-
-#if 1
-	/* FIXME: What is this for? */
-	gst_bit_reader_get_bits_uint32 (&gb, &bits, 8);
-	if (bits) /* FIXME: Is this check meant as a check if the read succeeded? In that case we have GstBitReader return value */
-		g_warning ("DVBSub error: line overflow");
-#else /* Original code from libavcodec for reference until the need is known: */
-	if (get_bits(&gb, 8))
-		av_log(0, AV_LOG_ERROR, "DVBSub error: line overflow\n");
-#endif
-
-	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-	         "bitreader position is %u; (%u + 7) >> 3 = %u",
-	         gst_bit_reader_get_pos (&gb), gst_bit_reader_get_pos (&gb), (gst_bit_reader_get_pos (&gb) + 7) >> 3);
-
-	(*srcbuf) += (gst_bit_reader_get_pos (&gb) + 7) >> 3;
-
-	bits = 0xbc;
-	gst_bit_reader_peek_bits_uint32 (&gb, &bits, 8);
-	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-	         "(n=4): Returning with %d pixels read (caller will advance x_pos by that), next byte is 0x%x%s", pixels_read, bits, (bits == 0xbc) ? " (MARKER)" : "");
-	return pixels_read;
-}
-
-#else
-
 // FFMPEG-FIXME: The same code in ffmpeg is much more complex, it could use the same
 // FFMPEG-FIXME: refactoring as done here, explained in commit 895296c3
 static int
@@ -1111,7 +915,6 @@ _dvb_sub_read_4bit_string(guint8 *destbuf, gint dbuf_len,
 	// FIXME: Shouldn't need this variable if tracking things in the loop better
 	return pixels_read;
 }
-#endif
 
 static int
 _dvb_sub_read_8bit_string(guint8 *destbuf, gint dbuf_len,
@@ -1280,6 +1083,7 @@ _dvb_sub_parse_pixel_data_block(DvbSub *dvb_sub, DVBSubObjectDisplay *display,
 				y_pos += 2;
 				break;
 			default:
+				/* FIXME: Do we consume word align stuffing byte that could follow top/bottom data? */
 				g_warning ("Unknown/unsupported pixel block 0x%x", *(buf-1));
 		}
 	}
