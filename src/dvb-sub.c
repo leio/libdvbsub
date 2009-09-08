@@ -957,10 +957,6 @@ _dvb_sub_read_8bit_string(guint8 *destbuf, gint dbuf_len,
 		pixels_read += run_length;
 	}
 
-	// FIXME: Test skip_to_byte instead of adding 7 bits, once everything else is working good
-	//gst_bit_reader_skip_to_byte (&gb);
-	*srcbuf += (gst_bit_reader_get_pos (&gb) + 7) >> 3;
-
 	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
 	         "Returning from 8bit_string parser with %u pixels read",
 	         pixels_read);
