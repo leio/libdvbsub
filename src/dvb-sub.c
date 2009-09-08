@@ -671,147 +671,105 @@ _dvb_sub_parse_clut_segment (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint
 	}
 }
 
+// FFMPEG-FIXME: The same code in ffmpeg is much more complex, it could use the same
+// FFMPEG-FIXME: refactoring as done here
 static int
 _dvb_sub_read_2bit_string(guint8 *destbuf, gint dbuf_len,
                           const guint8 **srcbuf, gint buf_size,
                           guint8 non_mod, guint8 *map_table)
 {
-	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-	         "(n=2): Inside %s with dbuf_len = %d", __PRETTY_FUNCTION__, dbuf_len);
-	/* TODO */
 	GstBitReader gb = GST_BIT_READER_INIT (*srcbuf, buf_size);
 	/* FIXME: Handle FALSE returns from gst_bit_reader_get_* calls? */
 
+	gboolean stop_parsing = FALSE;
 	guint32 bits;
-	guint run_length;
-	int pixels_read = 0;
+	guint32 pixels_read = 0;
 
-	while (gst_bit_reader_get_remaining (&gb) <= buf_size << 3 && pixels_read < dbuf_len) {
+	static gboolean warning_shown = FALSE;
+	if (!warning_shown) {
+		g_warning ("Parsing 2bit color DVB sub-picture. This is not tested at all. If you see this message, "
+		           "please provide the developers with sample media with these subtitles, if possible.");
+		warning_shown = TRUE;
+	}
+	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+	         "(n=2): Inside %s with dbuf_len = %d", __PRETTY_FUNCTION__, dbuf_len);
+
+	while (!stop_parsing && (gst_bit_reader_get_remaining (&gb) > 0)) {
+		guint run_length = 0, clut_index = 0;
 		gst_bit_reader_get_bits_uint32 (&gb, &bits, 2);
 
-		if (bits) {
-			if (non_mod != 1 || bits != 1) {
-				if (map_table) {
-					*destbuf++ = map_table[bits];
-					dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
-					         "(n=2): Putting pixel code 0x%x in destbuf per mapping table, original bit value is 0x%x", map_table[bits], bits);
-				}
-				else {
-					*destbuf++ = bits;
-					dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
-					         "(n=2): Putting pixel code 0x%x in destbuf", bits);
-				}
-			} else {
-				dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
-				         "(n=2): Non-modifying color, leaving one pixel hole");
-			}
-			pixels_read++;
-		} else {
+		if (bits) { /* 2-bit_pixel-code */
+			run_length = 1;
+			clut_index = bits;
+		} else { /* 2-bit_zero */
 			gst_bit_reader_get_bits_uint32 (&gb, &bits, 1);
-			if (bits == 1) {
+			if (bits == 1) { /* switch_1 == '1' */
 				gst_bit_reader_get_bits_uint32 (&gb, &run_length, 3);
 				run_length += 3;
-				gst_bit_reader_get_bits_uint32 (&gb, &bits, 2);;
-
-				if (non_mod == 1 && bits == 1)
-					pixels_read += run_length;
-				else {
-					if (map_table)
-						bits = map_table[bits];
-
-					dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-					         "(n=2): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]",
-					         bits, run_length, pixels_read, dbuf_len, ((pixels_read + run_length) < dbuf_len) ? "TRUE" : "FALSE");
-					while (run_length-- > 0 && pixels_read < dbuf_len) {
-						*destbuf++ = bits;
-						pixels_read++;
-					}
-				}
-			} else {
+				gst_bit_reader_get_bits_uint32 (&gb, &clut_index, 2);
+			} else { /* switch_1 == '0' */
 				gst_bit_reader_get_bits_uint32 (&gb, &bits, 1);
-				if (bits == 0) {
+				if (bits == 1) { /* switch_2 == '1' */
+					run_length = 1; /* 1x pseudo-colour '00' */
+				} else { /* switch_2 == '0' */
 					gst_bit_reader_get_bits_uint32 (&gb, &bits, 2);
-					if (bits == 2) {
-						gst_bit_reader_get_bits_uint32 (&gb, &run_length, 4);
-						run_length += 12;
-						gst_bit_reader_get_bits_uint32 (&gb, &bits, 2);
-
-						if (non_mod == 1 && bits == 1)
-							pixels_read += run_length;
-						else {
-							if (map_table)
-								bits = map_table[bits];
-							dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-							         "(n=2): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]",
-							         bits, run_length, pixels_read, dbuf_len, ((pixels_read + run_length) < dbuf_len) ? "TRUE" : "FALSE");
-							while (run_length-- > 0 && pixels_read < dbuf_len) {
-								*destbuf++ = bits;
-								pixels_read++;
-							}
-						}
-					} else if (bits == 3) {
-						gst_bit_reader_get_bits_uint32 (&gb, &run_length, 8);
-						run_length += 29;
-						gst_bit_reader_get_bits_uint32 (&gb, &bits, 2);
-
-						if (non_mod == 1 && bits == 1)
-							pixels_read += run_length;
-						else {
-							if (map_table)
-								bits = map_table[bits];
-							dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-							         "(n=2): Putting value 0x%x in destbuf %d times [pixels_read = %d, dbuf_len = %d, all will be added = %s]",
-							         bits, run_length, pixels_read, dbuf_len, ((pixels_read + run_length) < dbuf_len) ? "TRUE" : "FALSE");
-							while (run_length-- > 0 && pixels_read < dbuf_len) {
-								*destbuf++ = bits;
-								pixels_read++;
-							}
-						}
-					} else if (bits == 1) {
-						pixels_read += 2;
-						if (map_table)
-							bits = map_table[0];
-						else
-							bits = 0;
-						if (pixels_read <= dbuf_len) {
-							dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-							         "(n=2): Putting value 0x%x in destbuf 2 times (hardcoded)", bits);
-							*destbuf++ = bits;
-							*destbuf++ = bits;
-						}
-					} else {
-						(*srcbuf) += (gst_bit_reader_get_remaining (&gb) + 7) >> 3;
-						return pixels_read;
+					switch (bits) { /* switch_3 */
+						case 0x0: /* end of 2-bit/pixel_code_string */
+							stop_parsing = TRUE;
+							break;
+						case 0x1: /* two pixels shall be set to pseudo colour (entry) '00' */
+							run_length = 2;
+							break;
+						case 0x2: /* the following 6 bits contain run length coded pixel data */
+							gst_bit_reader_get_bits_uint32 (&gb, &run_length, 4);
+							run_length += 12;
+							gst_bit_reader_get_bits_uint32 (&gb, &clut_index, 2);
+							break;
+						case 0x3: /* the following 10 bits contain run length coded pixel data */
+							gst_bit_reader_get_bits_uint32 (&gb, &run_length, 8);
+							run_length += 29;
+							gst_bit_reader_get_bits_uint32 (&gb, &clut_index, 2);
+							break;
 					}
-				} else {
-					if (map_table)
-						bits = map_table[0];
-					else
-						bits = 0;
-					dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-					         "(n=2): Putting value 0x%x in destbuf 1 times (hardcoded)", bits);
-					*destbuf++ = bits;
-					pixels_read++;
 				}
 			}
 		}
+
+		/* If run_length is zero, continue. Only case happening is when
+		 * stop_parsing is TRUE too, so next cycle shouldn't run */
+		if (run_length == 0)
+			continue;
+
+		/* Trim the run_length to not go beyond the line end and consume
+		 * it from remaining length of dest line */
+		run_length = MIN (run_length, dbuf_len);
+		dbuf_len -= run_length;
+
+		/* Make clut_index refer to the index into the desired bit depths
+		 * CLUT definition table */
+		if (map_table)
+			clut_index = map_table[clut_index]; /* now clut_index signifies the index into map_table dest */
+
+		/* Now we can simply memset run_length count of destination bytes
+		 * to clut_index, but only if not non_modifying */
+		dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+		         "Setting %u pixels to color 0x%x in destination buffer; dbuf_len left is %d pixels",
+		         run_length, clut_index, dbuf_len);
+		if (!(non_mod == 1 && bits == 1))
+			memset (destbuf, clut_index, run_length);
+
+		destbuf += run_length;
+		pixels_read += run_length;
 	}
 
-#if 1
-	/* FIXME: What is this for? With current ported code it seems to always warn with current test case */
-	/* This might have simply been due to parsing 4bit strings with this 2bit string code */
-	gst_bit_reader_get_bits_uint32 (&gb, &bits, 6);
-	if (bits)
-		g_warning ("DVBSub error: line overflow");
-#else /* Original code from libavcodec for reference until the always warning is fixed: */
-	if (get_bits(&gb, 6))
-		g_warning ("DVBSub error: line overflow");
-#endif
-
-	(*srcbuf) += (gst_bit_reader_get_remaining (&gb) + 7) >> 3;
+	// FIXME: Test skip_to_byte instead of adding 7 bits, once everything else is working good
+	//gst_bit_reader_skip_to_byte (&gb);
+	*srcbuf += (gst_bit_reader_get_pos (&gb) + 7) >> 3;
 
 	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
-	         "(n=2): Returning with %d pixels read (caller will advance x_pos by that)", pixels_read);
+	         "Returning from 2bit_string parser with %u pixels read",
+	         pixels_read);
+	// FIXME: Shouldn't need this variable if tracking things in the loop better
 	return pixels_read;
 }
 
