@@ -879,9 +879,93 @@ _dvb_sub_read_8bit_string(guint8 *destbuf, gint dbuf_len,
                           const guint8 **srcbuf, gint buf_size,
                           guint8 non_mod, guint8 *map_table)
 {
-	g_warning ("Inside %s", __PRETTY_FUNCTION__);
-	/* TODO */
-	return dbuf_len;
+	GstBitReader gb = GST_BIT_READER_INIT (*srcbuf, buf_size);
+	/* FIXME: Handle FALSE returns from gst_bit_reader_get_* calls? */
+
+	gboolean stop_parsing = FALSE;
+	guint32 bits;
+	guint32 pixels_read = 0;
+
+	static gboolean warning_shown = FALSE;
+	if (!warning_shown) {
+		g_warning ("Parsing 8bit color DVB sub-picture. This is not tested at all. If you see this message, "
+		           "please provide the developers with sample media with these subtitles, if possible.");
+		warning_shown = TRUE;
+	}
+	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+	         "(n=8): Inside %s with dbuf_len = %d", __PRETTY_FUNCTION__, dbuf_len);
+
+	/* FFMPEG-FIXME: ffmpeg uses a manual byte walking algorithm, which might be more performant,
+	 * FFMPEG-FIXME: but it does almost absolutely no buffer length checking, so could walk over
+	 * FFMPEG-FIXME: memory boundaries. While we don't check gst_bit_reader_get_bits_uint32
+	 * FFMPEG-FIXME: return values either and therefore might get some pixels corrupted, we at
+	 * FFMPEG-FIXME: lest have no chance of reading memory we don't own and visual corruption
+	 * FFMPEG-FIXME: is guaranteed anyway when not all bytes are present */
+	/* Rephrased - it's better to work with bytes with default value '0' instead of reading from memory we don't own.*/
+	while (!stop_parsing && (gst_bit_reader_get_remaining (&gb) > 0)) {
+		guint run_length = 0, clut_index = 0;
+		gst_bit_reader_get_bits_uint32 (&gb, &bits, 8);
+
+		if (bits) { /* 8-bit_pixel-code */
+			run_length = 1;
+			clut_index = bits;
+		} else { /* 8-bit_zero */
+			gst_bit_reader_get_bits_uint32 (&gb, &bits, 1);
+			if (bits == 0) { /* switch_1 == '0' */
+				gst_bit_reader_get_bits_uint32 (&gb, &run_length, 7);
+				if (run_length == 0) {
+					stop_parsing = TRUE;
+				}
+			} else { /* switch_1 == '1' */
+				gst_bit_reader_get_bits_uint32 (&gb, &run_length, 7);
+#ifdef DEBUG
+				/* Emit a debugging message about stream not following specification */
+				if (run_length < 3) {
+					dvb_log (DVB_LOG_STREAM, G_LOG_LEVEL_WARNING,
+					         "8-bit/pixel_code_string::run_length_3-127 value was %u, but the spec requires it must be >=3",
+					         run_length);
+				}
+#endif
+				gst_bit_reader_get_bits_uint32 (&gb, &clut_index, 8);
+			}
+		}
+
+		/* If run_length is zero, continue. Only case happening is when
+		 * stop_parsing is TRUE too, so next cycle shouldn't run */
+		if (run_length == 0)
+			continue;
+
+		/* Trim the run_length to not go beyond the line end and consume
+		 * it from remaining length of dest line */
+		run_length = MIN (run_length, dbuf_len);
+		dbuf_len -= run_length;
+
+		/* Make clut_index refer to the index into the desired bit depths
+		 * CLUT definition table */
+		if (map_table)
+			clut_index = map_table[clut_index]; /* now clut_index signifies the index into map_table dest */
+
+		/* Now we can simply memset run_length count of destination bytes
+		 * to clut_index, but only if not non_modifying */
+		dvb_log (DVB_LOG_RUNLEN, G_LOG_LEVEL_DEBUG,
+		         "Setting %u pixels to color 0x%x in destination buffer; dbuf_len left is %d pixels",
+		         run_length, clut_index, dbuf_len);
+		if (!(non_mod == 1 && bits == 1))
+			memset (destbuf, clut_index, run_length);
+
+		destbuf += run_length;
+		pixels_read += run_length;
+	}
+
+	// FIXME: Test skip_to_byte instead of adding 7 bits, once everything else is working good
+	//gst_bit_reader_skip_to_byte (&gb);
+	*srcbuf += (gst_bit_reader_get_pos (&gb) + 7) >> 3;
+
+	dvb_log (DVB_LOG_PIXEL, G_LOG_LEVEL_DEBUG,
+	         "Returning from 8bit_string parser with %u pixels read",
+	         pixels_read);
+	// FIXME: Shouldn't need this variable if tracking things in the loop better
+	return pixels_read;
 }
 
 static void
