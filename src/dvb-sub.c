@@ -1510,17 +1510,15 @@ dvb_sub_feed (DvbSub *dvb_sub, guint8 *data, gint len)
 	guint8 PES_packet_header_len;
 	gint counter = 0;
 
-	dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
-	         "Inside dvb_sub_feed with length %d\n", len);
-
 	while (TRUE) {
 		++counter;
-		dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
-		         "=============== PES packet number %04u ===============\nAt position %u", counter, pos);
 		data = data + pos;
 		len = len - pos;
 		total_pos += pos;
 		pos = 0;
+
+		dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
+		         "======= PES packet number %04u ==== bytes left: %d =======", counter, len);
 
 		if (len == 0)
 			return 0;
@@ -1542,7 +1540,7 @@ dvb_sub_feed (DvbSub *dvb_sub, guint8 *data, gint len)
 
 		PES_packet_len = (data[4] << 8) | data[5];
 		dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
-		         "PES packet length is %u\n", PES_packet_len);
+		         "PES packet length is %u", PES_packet_len);
 		pos = 6;
 
 		/* FIXME: If the packet is cut, we could be feeding data more than we actually have here, which breaks everything. Probably need to buffer up and handle it,
@@ -1560,7 +1558,7 @@ dvb_sub_feed (DvbSub *dvb_sub, guint8 *data, gint len)
 		dvb_sub_feed_with_pts (dvb_sub, pts, data + pos, PES_packet_len - PES_packet_header_len - 3); /* 2 bytes between PES_packet_len and PES_packet_header_len fields, minus header_len itself */
 		pos += PES_packet_len - PES_packet_header_len - 3;
 		dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
-		         "Finished PES packet number %u\n", counter);
+		         "Finished PES packet number %u (consumed %u bytes of %d)", counter, pos, len);
 	}
 	return total_pos; /* FIXME */
 }
