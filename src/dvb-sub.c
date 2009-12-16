@@ -1724,19 +1724,19 @@ dvb_sub_open_pid (DvbSub *dvb_sub, guint16 pid)
 	if (priv->fd >= 0) /* a file is already open, close it first */
 		dvb_sub_close_pid (dvb_sub);
 
-	priv->fd = open ("/dev/dvb/adapter0/demux0", O_RDWR | O_NONBLOCK); /* FIXME: allow other hardware demuxers and adapters */
+	priv->fd = TEMP_FAILURE_RETRY (open ("/dev/dvb/adapter0/demux0", O_RDONLY | O_NONBLOCK)); /* FIXME: allow other hardware demuxers and adapters */
 	if (priv->fd < 0) {
 		perror ("open /dev/dvb/adapter0/demux0");
 		return -1;
 	}
 
-	ret = ioctl (priv->fd, DMX_SET_PES_FILTER, &pesfilter);
+	ret = TEMP_FAILURE_RETRY (ioctl (priv->fd, DMX_SET_PES_FILTER, &pesfilter));
 		if (ret != 0) {
 		perror ("ioctl DMX_SET_PES_FILTER");
 		goto error;
 	}
 
-	ret = ioctl (priv->fd, DMX_START);
+	ret = TEMP_FAILURE_RETRY (ioctl (priv->fd, DMX_START));
 	if (ret != 0) {
 		perror ("ioctl DMX_START");
 		goto error;
