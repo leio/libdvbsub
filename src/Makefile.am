@@ -5,7 +5,8 @@ AM_CPPFLAGS = \
 	$(LIBDVBSUB_CFLAGS)
 
 AM_CFLAGS =\
-	 -Wall\
+	 -Wall \
+	 -D_GNU_SOURCE \
 	 $(DEBUGFLAGS)
 
 lib_LTLIBRARIES = libdvbsub-1.la
