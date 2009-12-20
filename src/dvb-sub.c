@@ -141,6 +141,7 @@ struct _DvbSubPrivate
 	/* FIXME... */
 	int display_list_size;
 	DVBSubRegionDisplay *display_list;
+	GString *pes_buffer;
 };
 
 #define DVB_SUB_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), DVB_TYPE_SUB, DvbSubPrivate))
@@ -281,6 +282,7 @@ dvb_sub_init (DvbSub *self)
 	priv->region_list = NULL;
 	priv->object_list = NULL;
 	priv->page_time_out = 0; /* FIXME: Maybe 255 instead? */
+	priv->pes_buffer = g_string_new (NULL);
 }
 
 static void
@@ -293,6 +295,7 @@ dvb_sub_finalize (GObject *object)
 	if (priv->fd >= 0)
 		dvb_sub_close_pid (self);
 	delete_state (self); /* close_pid should have called this, but lets be sure */
+	g_string_free (priv->pes_buffer, TRUE);
 
 	G_OBJECT_CLASS (dvb_sub_parent_class)->finalize (object);
 }
@@ -1494,73 +1497,73 @@ dvb_sub_new (void)
  * @data: The data to feed to the parser
  * @len: Length of the data
  *
- * Feeds the DvbSub parser with new binary data to parse.
+ * Feeds the DvbSub parser with new PES packet data to parse.
  * The data given must be a full PES packet, which must
  * include a PTS field in the headers.
+ * Only one packet is handled in one call, so the available data
+ * should be fed continously until all is consumed.
  *
- * Return value: a negative value on errors; Amount of data consumed on success. TODO
+ * Return value: a negative value on errors, -4 if simply not enough data for the PES packet;
+ *               Amount of data consumed (length of handled PES packet on success)
  */
 gint
 dvb_sub_feed (DvbSub *dvb_sub, guint8 *data, gint len)
 {
 	guint64 pts = 0;
 	unsigned int pos = 0;
-	unsigned int total_pos = 0; /* FIXME: This is just for debugging that all was processed */
 	guint16 PES_packet_len;
 	guint8 PES_packet_header_len;
-	gint counter = 0;
+	gboolean is_subtitle_packet = TRUE;
 
-	while (TRUE) {
-		++counter;
-		data = data + pos;
-		len = len - pos;
-		total_pos += pos;
-		pos = 0;
+	if (len == 0)
+		return 0;
 
-		dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
-		         "======= PES packet number %04u ==== bytes left: %d =======", counter, len);
-
-		if (len == 0)
-			return 0;
-
-		if (len <= 8) {
-			g_warning ("Length %d too small for further processing. Finishing after %u bytes have been processed", len, total_pos);
-			return -1;
-		}
-
-		if (data[0] != 0x00 || data[1] != 0x00 || data[2] != 0x01) {
-			g_warning ("Data fed to dvb_sub_feed is not a PES packet - does not start with a code_prefix of 0x000001");
-			return -1;
-		}
-
-		if (data[3] != 0xBD) {
-			g_warning ("Data fed to dvb_sub_feed is not a PES packet of type private_stream_1, but rather '0x%x', so not a subtitle stream", data[3]);
-			return -1;
-		}
-
-		PES_packet_len = (data[4] << 8) | data[5];
-		dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
-		         "PES packet length is %u", PES_packet_len);
-		pos = 6;
-
-		/* FIXME: If the packet is cut, we could be feeding data more than we actually have here, which breaks everything. Probably need to buffer up and handle it,
-		 * FIXME: Or push back in front to the file descriptor buffer (but we are using read, not libc buffered fread, so that idea might not be possible )*/
-		if ((len - 5) < PES_packet_len) {
-			g_warning ("!!!!!!!!!!! claimed PES packet length was %d, but we only had %d bytes left... Cut packet, ignoring !!!!!!!!!", PES_packet_len, len - 5);
-			return -4;
-		}
-		/* FIXME: Validate sizes inbetween here */
-
-		pos = 8; /* Later we should get that value with walking with pos++ instead */
-		PES_packet_header_len = data[pos++];
-		pos += PES_packet_header_len; /* FIXME: Currently including all header values, including PTS */
-
-		dvb_sub_feed_with_pts (dvb_sub, pts, data + pos, PES_packet_len - PES_packet_header_len - 3); /* 2 bytes between PES_packet_len and PES_packet_header_len fields, minus header_len itself */
-		pos += PES_packet_len - PES_packet_header_len - 3;
-		dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
-		         "Finished PES packet number %u (consumed %u bytes of %d)", counter, pos, len);
+	if (len <= 8) {
+		g_warning ("Length %d too small for further processing", len);
+		return -1;
 	}
-	return total_pos; /* FIXME */
+
+	if (data[0] != 0x00 || data[1] != 0x00 || data[2] != 0x01) {
+		g_warning ("Data fed to dvb_sub_feed is not a PES packet - does not start with a code_prefix of 0x000001");
+		return 1; // FIXME: Probably handle it? - we need to skip PES_packet_len from this elementary stream then and move on
+	}
+
+	if (data[3] != 0xBD) {
+		dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_INFO,
+				 "Data fed to dvb_sub_feed is not a PES packet of type private_stream_1, but rather '0x%X', so not a subtitle stream", data[3]);
+		is_subtitle_packet = FALSE;
+	}
+
+	PES_packet_len = (data[4] << 8) | data[5];
+	dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
+				"PES packet length is %u", PES_packet_len);
+	pos = 6;
+
+	/* FIXME: If the packet is cut, we could be feeding data more than we actually have here, which breaks everything. Probably need to buffer up and handle it,
+		* FIXME: Or push back in front to the file descriptor buffer (but we are using read, not libc buffered fread, so that idea might not be possible )*/
+	if ((len - 5) < PES_packet_len) {
+		dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_WARNING,
+				 "!!!!!!!!!!! claimed PES packet length was %d, but we only had %d bytes available, falling back and waiting more !!!!!!!!!", PES_packet_len, len - 5);
+		return -4;
+	}
+	/* FIXME: Validate sizes inbetween here */
+
+	/* If this is a non-subtitle packet, still skip the data, pretending we consumed it (FIXME: Signal up) */
+	if (!is_subtitle_packet) {
+		return pos + PES_packet_len;
+	}
+
+	pos = 8; /* Later we should get that value with walking with pos++ instead */
+
+	PES_packet_header_len = data[pos++];
+	pos += PES_packet_header_len; /* FIXME: Currently including all header values, including PTS */
+
+	dvb_sub_feed_with_pts (dvb_sub, pts, data + pos, PES_packet_len - PES_packet_header_len - 3); /* 2 bytes between PES_packet_len and PES_packet_header_len fields, minus header_len itself */
+	pos += PES_packet_len - PES_packet_header_len - 3;
+	dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
+				"Finished PES packet - consumed %u bytes of %d", pos, len);
+
+	return pos;
 }
 
 #define DVB_SUB_SEGMENT_PAGE_COMPOSITION 0x10
@@ -1790,6 +1793,7 @@ dvb_sub_read_data (DvbSub *dvb_sub)
 	GString *data; /* FIXME: Probably don't use GString in the long run? */
 	gchar buf[4096];
 	ssize_t len_read;
+	int ret;
 
 	g_return_if_fail (dvb_sub != NULL);
 	g_return_if_fail (DVB_IS_SUB (dvb_sub));
@@ -1797,8 +1801,6 @@ dvb_sub_read_data (DvbSub *dvb_sub)
 	priv = (DvbSubPrivate *)dvb_sub->private_data;
 
 	g_return_if_fail (priv->fd >= 0);
-
-	data = g_string_sized_new (4096);
 
 	while ((len_read = read (priv->fd, buf, 4096))) {
 		if (len_read < 0) {
@@ -1808,13 +1810,17 @@ dvb_sub_read_data (DvbSub *dvb_sub)
 			break;
 		}
 
-		g_string_append_len (data, buf, len_read);
+		g_string_append_len (priv->pes_buffer, buf, len_read);
 	}
 
 	dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
-	         "read_data called by API user, feeding %" G_GSIZE_FORMAT " bytes into DVB subtitle parser", data->len);
-	dvb_sub_feed (dvb_sub, (guint8 *)data->str, data->len);
-	g_string_free (data, TRUE);
+	         "read_data called by API user, feeding %" G_GSIZE_FORMAT " bytes into DVB subtitle parser", priv->pes_buffer->len);
+
+	do {
+		ret = dvb_sub_feed (dvb_sub, (guint8 *)(priv->pes_buffer->str), priv->pes_buffer->len);
+		if (ret > 0)
+			g_string_erase (priv->pes_buffer, 0, ret);
+	} while (ret > 0);
 }
 
 /**
