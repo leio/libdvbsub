@@ -1519,12 +1519,14 @@ dvb_sub_feed (DvbSub *dvb_sub, guint8 *data, gint len)
 		return 0;
 
 	if (len <= 8) {
-		g_warning ("Length %d too small for further processing", len);
+		dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_WARNING,
+		         "Length %d too small for further processing", len);
 		return -1;
 	}
 
 	if (data[0] != 0x00 || data[1] != 0x00 || data[2] != 0x01) {
-		g_warning ("Data fed to dvb_sub_feed is not a PES packet - does not start with a code_prefix of 0x000001");
+		dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_WARNING,
+		         "Data fed to dvb_sub_feed is not a PES packet - does not start with a code_prefix of 0x000001");
 		return 1; // FIXME: Probably handle it? - we need to skip PES_packet_len from this elementary stream then and move on
 	}
 
