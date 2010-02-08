@@ -1356,7 +1356,7 @@ save_display_set(DvbSub *dvb_sub)
 #endif
 
 static gint
-_dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint buf_size)
+_dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *buf, gint buf_size, guint64 pts)
 {
 	DvbSubPrivate *priv = (DvbSubPrivate *)dvb_sub->private_data;
 
@@ -1460,7 +1460,7 @@ _dvb_sub_parse_end_of_display_set (DvbSub *dvb_sub, guint16 page_id, guint8 *buf
 #endif
 
 	if (priv->callbacks.new_data)
-		priv->callbacks.new_data (dvb_sub, sub, priv->page_time_out, priv->user_data);
+		priv->callbacks.new_data (dvb_sub, pts, sub, priv->page_time_out, priv->user_data);
 
 	/* Now free up all the temporary memory we allocated */
 	for (i = 0; i < sub->num_rects; ++i) {
@@ -1665,7 +1665,7 @@ dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8* data, gint len)
 			case DVB_SUB_SEGMENT_END_OF_DISPLAY_SET:
 				dvb_log (DVB_LOG_PACKET, G_LOG_LEVEL_DEBUG,
 				         "End of display set at buffer pos %u\n", pos);
-				_dvb_sub_parse_end_of_display_set (dvb_sub, page_id, data + pos, segment_len); /* FIXME: Not sure about args */
+				_dvb_sub_parse_end_of_display_set (dvb_sub, page_id, data + pos, segment_len, pts); /* FIXME: Not sure about args */
 				break;
 			default:
 				g_warning ("Unhandled segment type 0x%x", segment_type);
