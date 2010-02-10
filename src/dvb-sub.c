@@ -1514,6 +1514,7 @@ dvb_sub_feed (DvbSub *dvb_sub, guint8 *data, gint len)
 	guint16 PES_packet_len;
 	guint8 PES_packet_header_len;
 	gboolean is_subtitle_packet = TRUE;
+	gboolean pts_field_present = FALSE;
 
 	if (len == 0)
 		return 0;
@@ -1555,10 +1556,29 @@ dvb_sub_feed (DvbSub *dvb_sub, guint8 *data, gint len)
 		return pos + PES_packet_len;
 	}
 
-	pos = 8; /* Later we should get that value with walking with pos++ instead */
+	pos++;
+
+	if (data[pos++] & 0x80)
+	{ /* PTS fields present (possibly also DTS). Technically this must be present per the spec */
+		pts_field_present = TRUE;
+	}
+
+	/* pos should be 8 now anyway */
+	pos = 8;
 
 	PES_packet_header_len = data[pos++];
-	pos += PES_packet_header_len; /* FIXME: Currently including all header values, including PTS */
+
+	if (pts_field_present)
+	{
+		/* '001x', PTS[32..30], marker, PTS[29..15], marker, PTS[14..0], marker */
+		pts  = ((guint64) (data[pos]   & 0x0E)) << 29; /* PTS[32..30], ignore marker at rightmost bit */
+		pts |= ((guint64) (data[pos+1]       )) << 22; /* PTS[29..22], full byte */
+		pts |= ((guint64) (data[pos+2] & 0xFE)) << 14; /* PTS[21..15], ignore marker at rightmost bit */
+		pts |= ((guint64) (data[pos+3]       )) << 7;  /* PTS[14.. 7], full byte */
+		pts |= ((guint64) (data[pos+4] & 0xFE)) >> 1;  /* PTS[ 6.. 0], ignore marker at rightmost bit */
+	}
+
+	pos += PES_packet_header_len; /* FIXME: Currently including all header values with all but PTS ignored */
 
 	dvb_sub_feed_with_pts (dvb_sub, pts, data + pos, PES_packet_len - PES_packet_header_len - 3); /* 2 bytes between PES_packet_len and PES_packet_header_len fields, minus header_len itself */
 	pos += PES_packet_len - PES_packet_header_len - 3;
