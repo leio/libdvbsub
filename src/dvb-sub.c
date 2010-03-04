@@ -1841,7 +1841,11 @@ dvb_sub_read_data (DvbSub *dvb_sub)
 	do {
 		ret = dvb_sub_feed (dvb_sub, (guint8 *)(priv->pes_buffer->str), priv->pes_buffer->len);
 		if (ret > 0)
-			g_string_erase (priv->pes_buffer, 0, ret);
+			/* FIXME: MIN() is a temporary workaround because dvb_sub_feed(_with_pts) returned in a rare circumstance
+			 * a number bigger than the length passed to it. That needs to be fixed instead, but it was a rare
+			 * occurrence with not enough debug enabled at the time to find the problem quickly enough for next release,
+			 * so just at least don't end up in an infinite loop meanwhile. */
+			g_string_erase (priv->pes_buffer, 0, MIN(ret, priv->pes_buffer->len));
 	} while (ret > 0);
 }
 
