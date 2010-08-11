@@ -1708,6 +1708,7 @@ dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8* data, gint len)
  * FIXME: for gstreamer needs */
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdio.h> /* perror, printf */
 #include <sys/ioctl.h>
 #include <linux/dvb/dmx.h>
 
@@ -1767,7 +1768,7 @@ dvb_sub_open_pid (DvbSub *dvb_sub, guint16 pid, const gchar *adapter)
 		perror ("ioctl DMX_START");
 		goto error;
 	} else {
-		printf ("Demuxing started on pid %u\n", pid);
+		printf ("DVB-SUB demuxing started on pid %u\n", pid);
 	}
 
 	return priv->fd;
