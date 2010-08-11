@@ -1715,6 +1715,7 @@ dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8* data, gint len)
  * dvb_sub_open_pid:
  * @dvb_sub: a #DvbSub
  * @pid: the MPEG-TS PID to open
+ * @adapter: the device onto which to install the demux filter
  *
  * Opens a PID directly at the LinuxDVB layer. This is an alternative to feeding
  * data to the parser manually through dvb_sub_feed() or dvb_sub_feed_with_pts().
@@ -1728,7 +1729,7 @@ dvb_sub_feed_with_pts (DvbSub *dvb_sub, guint64 pts, guint8* data, gint len)
  * Return value: the file descriptor opened, -1 on error.
  */
 int
-dvb_sub_open_pid (DvbSub *dvb_sub, guint16 pid)
+dvb_sub_open_pid (DvbSub *dvb_sub, guint16 pid, const gchar *adapter)
 {
 	DvbSubPrivate *priv;
 	int ret;
@@ -1749,9 +1750,9 @@ dvb_sub_open_pid (DvbSub *dvb_sub, guint16 pid)
 	if (priv->fd >= 0) /* a file is already open, close it first */
 		dvb_sub_close_pid (dvb_sub);
 
-	priv->fd = TEMP_FAILURE_RETRY (open ("/dev/dvb/adapter0/demux0", O_RDONLY | O_NONBLOCK)); /* FIXME: allow other hardware demuxers and adapters */
+	priv->fd = TEMP_FAILURE_RETRY (open (adapter, O_RDONLY | O_NONBLOCK)); /* FIXME: allow other hardware demuxers and adapters */
 	if (priv->fd < 0) {
-		perror ("open /dev/dvb/adapter0/demux0");
+		perror (adapter);
 		return -1;
 	}
 
